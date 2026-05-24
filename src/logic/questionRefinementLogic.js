@@ -21,9 +21,14 @@ const INTENT_OPTIONS = [
       "paid",
       "paying",
       "earn",
+      "earning",
       "app",
       "product",
       "launch",
+      "customer",
+      "client",
+      "roi",
+      "return",
     ],
   },
   {
@@ -231,8 +236,11 @@ const TIMEFRAME_PATTERNS = [
   /\b\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
   /\bnext\s+(day|week|month|year|few days|few weeks|few months)\b/i,
   /\bwithin\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
-  /\bby\s+(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|the end|end of)\b/i,
+  /\bwithin\s+(the\s+)?next\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+  /\bwithin\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months)\b/i,
+  /\bby\s+(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|the end|end of)\b/i,
   /\bthis\s+(week|month|year|quarter)\b/i,
+  /\bin\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
 ];
 
 function clean(value) {
@@ -255,6 +263,129 @@ function hasTimeframe(text) {
 
 function unique(values) {
   return [...new Set(values.filter(Boolean))];
+}
+
+function stripTrailingQuestionMarks(text) {
+  return clean(text).replace(/\?+$/g, "").trim();
+}
+
+function normalizeTimeframe(timeframe) {
+  const value = lower(timeframe);
+
+  if (!value) {
+    return "";
+  }
+
+  const cleanupMap = {
+    "three months": "the next three months",
+    "3 months": "the next three months",
+    "next three months": "the next three months",
+    "next 3 months": "the next three months",
+    "within next three months": "the next three months",
+    "within the next three months": "the next three months",
+    "within next 3 months": "the next three months",
+    "within the next 3 months": "the next three months",
+    "one month": "the next month",
+    "1 month": "the next month",
+    "next month": "the next month",
+    "next week": "the next week",
+    "one week": "the next week",
+    "1 week": "the next week",
+    "next year": "the next year",
+    "one year": "the next year",
+    "1 year": "the next year",
+  };
+
+  return cleanupMap[value] || clean(timeframe);
+}
+
+function removeDuplicateTimeframeFromQuestion(question, timeframe) {
+  let result = stripTrailingQuestionMarks(question);
+  const normalized = normalizeTimeframe(timeframe);
+
+  if (!result || !normalized) {
+    return result;
+  }
+
+  const duplicatePatterns = [
+    /\s+within\s+next\s+three\s+months$/i,
+    /\s+within\s+the\s+next\s+three\s+months$/i,
+    /\s+in\s+three\s+months$/i,
+    /\s+within\s+3\s+months$/i,
+    /\s+within\s+the\s+next\s+3\s+months$/i,
+    /\s+within\s+next\s+3\s+months$/i,
+    /\s+next\s+three\s+months$/i,
+    /\s+next\s+3\s+months$/i,
+  ];
+
+  duplicatePatterns.forEach((pattern) => {
+    result = result.replace(pattern, "").trim();
+  });
+
+  return result;
+}
+
+function inferCleanSubject(rawQuestion, objectRole) {
+  const raw = lower(rawQuestion);
+  const object = clean(objectRole);
+
+  if (object) {
+    return object;
+  }
+
+  if (raw.includes("this app")) {
+    return "this app";
+  }
+
+  if (raw.includes("wwg app")) {
+    return "the WWG app";
+  }
+
+  if (raw.includes("app")) {
+    return "the app";
+  }
+
+  return "the matter";
+}
+
+function inferOutcomePhrase(rawQuestion, clarifiedIntent, detectedIntentId) {
+  const combined = lower(`${rawQuestion} ${clarifiedIntent}`);
+
+  if (
+    detectedIntentId === "money" ||
+    combined.includes("money") ||
+    combined.includes("profit") ||
+    combined.includes("revenue") ||
+    combined.includes("income")
+  ) {
+    return "generate profit";
+  }
+
+  if (combined.includes("make money")) {
+    return "generate profit";
+  }
+
+  if (detectedIntentId === "relationship") {
+    return "develop favorably";
+  }
+
+  if (detectedIntentId === "health") {
+    return "improve";
+  }
+
+  if (detectedIntentId === "career") {
+    return "produce a favorable career outcome";
+  }
+
+  if (detectedIntentId === "lostObject") {
+    return "be found";
+  }
+
+  if (detectedIntentId === "personalReadiness") {
+    return "be maintained successfully";
+  }
+
+  return "produce the desired outcome";
 }
 
 function detectQuestionForm(question) {
@@ -399,26 +530,47 @@ export function buildFinalCastingQuestionSuggestion({
   const intent = clean(clarifiedIntent);
   const self = clean(selfRole);
   const object = clean(objectRole);
-  const time = clean(timeframe);
+  const time = normalizeTimeframe(timeframe);
 
   if (!raw && !intent && !object) {
     return "";
   }
 
-  if (raw && time && !hasTimeframe(raw)) {
-    return `${raw.replace(/\?+$/g, "")} within ${time}?`;
+  const detectedIntent = detectQuestionIntent([raw, intent, object].join(" "));
+  const cleanBase = removeDuplicateTimeframeFromQuestion(raw, time);
+
+  if (detectedIntent.id === "money") {
+    const subject = inferCleanSubject(raw, object);
+    const cleanSubject =
+      subject.toLowerCase() === "wwg app" ? "the WWG app" : subject;
+
+    if (time) {
+      return `Will ${cleanSubject} generate profit within ${time}?`;
+    }
+
+    return `Will ${cleanSubject} generate profit?`;
+  }
+
+  if (cleanBase && time && !hasTimeframe(raw)) {
+    return `${cleanBase} within ${time}?`;
+  }
+
+  if (cleanBase && time && hasTimeframe(raw)) {
+    return `${cleanBase} within ${time}?`;
   }
 
   if (raw) {
     return raw.endsWith("?") ? raw : `${raw}?`;
   }
 
+  const outcomePhrase = inferOutcomePhrase(raw, intent, detectedIntent.id);
+
   if (intent && object && time) {
-    return `Will ${object} produce the desired outcome for ${self || "me"} within ${time}?`;
+    return `Will ${object} ${outcomePhrase} for ${self || "me"} within ${time}?`;
   }
 
   if (object && time) {
-    return `Will ${object} produce the desired outcome within ${time}?`;
+    return `Will ${object} ${outcomePhrase} within ${time}?`;
   }
 
   return intent || object || "";
@@ -443,7 +595,7 @@ export function analyzeQuestionRefinement({
   const emotion = clean(emotionalTone);
   const self = clean(selfRole);
   const object = clean(objectRole);
-  const time = clean(timeframe);
+  const time = normalizeTimeframe(timeframe);
 
   const suggestedFinalQuestion = buildFinalCastingQuestionSuggestion({
     rawQuestion: raw,

@@ -292,6 +292,20 @@ function CompareCell({ value, isDifferent }) {
   );
 }
 
+function RecommendationList({ items, fallback }) {
+  if (!Array.isArray(items) || items.length === 0) {
+    return <p>{fallback || "No details available yet."}</p>;
+  }
+
+  return (
+    <ul className="warning-list">
+      {items.map((item, index) => (
+        <li key={`${item}-${index}`}>{item}</li>
+      ))}
+    </ul>
+  );
+}
+
 function App() {
   const [rawQuestion, setRawQuestion] = useState("");
   const [clarifiedIntent, setClarifiedIntent] = useState("");
@@ -2068,26 +2082,46 @@ function App() {
 
       <section className="panel recommendation-panel">
         <h2>9. Recommendation Layer</h2>
+
         <div className="recommendation-grid">
-          <div className="recommendation-card">
-            <strong>Preliminary Result</strong>
-            <p>{recommendation.result}</p>
+          <div className="recommendation-card recommendation-action">
+            <strong>Result Meaning</strong>
+            <p>
+              {recommendation.plainMeaning ||
+                recommendation.reason ||
+                "No result meaning available yet."}
+            </p>
           </div>
+
           <div className="recommendation-card">
-            <strong>Reason</strong>
-            <p>{recommendation.reason}</p>
+            <strong>Final Judgment</strong>
+            <p>{recommendation.finalJudgment || recommendation.result}</p>
           </div>
+
           <div className="recommendation-card">
-            <strong>Risk</strong>
-            <p>{recommendation.risk}</p>
+            <strong>Supporting Signs</strong>
+            <RecommendationList
+              items={recommendation.supportingSigns}
+              fallback={recommendation.reason}
+            />
           </div>
+
           <div className="recommendation-card">
-            <strong>Next Check</strong>
-            <p>{recommendation.nextCheck}</p>
+            <strong>Warning Signs</strong>
+            <RecommendationList
+              items={recommendation.warningSigns}
+              fallback={recommendation.risk}
+            />
           </div>
+
           <div className="recommendation-card recommendation-action">
             <strong>Recommended Action</strong>
             <p>{recommendation.action}</p>
+          </div>
+
+          <div className="recommendation-card">
+            <strong>Next Check</strong>
+            <p>{recommendation.nextCheck}</p>
           </div>
         </div>
       </section>
@@ -2210,10 +2244,18 @@ function App() {
             <strong>Rule conclusion:</strong> {ruleGraph.conclusion}
           </p>
           <p>
-            <strong>Confidence:</strong> {conflictReport.confidence}
+            <strong>Confidence:</strong>{" "}
+            {recommendation.confidence || conflictReport.confidence}
           </p>
           <p>
-            <strong>Recommendation:</strong> {recommendation.result}
+            <strong>Result meaning:</strong>{" "}
+            {recommendation.plainMeaning ||
+              recommendation.reason ||
+              "No result meaning available yet."}
+          </p>
+          <p>
+            <strong>Final judgment:</strong>{" "}
+            {recommendation.finalJudgment || recommendation.result}
           </p>
           <p>
             <strong>Recommended action:</strong> {recommendation.action}
