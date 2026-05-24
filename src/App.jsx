@@ -13,6 +13,17 @@ import { heavenlyStems } from "./data/stems";
 import { casePresets } from "./data/casePresets";
 
 import { recommendMethod, getQuestionWarnings } from "./logic/questionLogic";
+import {
+  analyzeQuestionRefinement,
+  buildQuestionRefinementSummary,
+  getQuestionIntentOptions,
+} from "./logic/questionRefinementLogic";
+import {
+  buildCoinCastingSummary,
+  castSixLinesWithCoins,
+  formatCoinCastingLine,
+  getCoinCastingLegend,
+} from "./logic/castingLogic";
 import { buildCalendarContext } from "./logic/calendarEngine";
 import { buildReadingSummary } from "./logic/exportSummaryLogic";
 import {
@@ -44,6 +55,7 @@ import {
 } from "./logic/snapshotStorage";
 import {
   buildSnapshotCompareRows,
+  buildSnapshotCompareSummary,
   buildSnapshotCompareText,
 } from "./logic/snapshotCompareLogic";
 
@@ -281,6 +293,13 @@ function CompareCell({ value, isDifferent }) {
 }
 
 function App() {
+  const [rawQuestion, setRawQuestion] = useState("");
+  const [clarifiedIntent, setClarifiedIntent] = useState("");
+  const [knownFacts, setKnownFacts] = useState("");
+  const [assumptions, setAssumptions] = useState("");
+  const [emotionalTone, setEmotionalTone] = useState("");
+  const [selectedQuestionIntent, setSelectedQuestionIntent] = useState("");
+
   const [question, setQuestion] = useState("");
   const [selectedMethod, setSelectedMethod] = useState("GLDM");
   const [selfRole, setSelfRole] = useState("");
@@ -289,6 +308,7 @@ function App() {
 
   const [lines, setLines] = useState(defaultLines);
   const [lineBranches, setLineBranches] = useState(defaultLineBranches);
+  const [coinCastingHistory, setCoinCastingHistory] = useState([]);
 
   const [castingDate, setCastingDate] = useState("");
   const [castingTime, setCastingTime] = useState("");
@@ -333,9 +353,42 @@ function App() {
     setSavedSnapshots(loadSavedSnapshots());
   }, []);
 
+  const questionIntentOptions = getQuestionIntentOptions();
+  const coinCastingLegend = getCoinCastingLegend();
+
+  const questionRefinement = useMemo(
+    () =>
+      analyzeQuestionRefinement({
+        rawQuestion,
+        clarifiedIntent,
+        knownFacts,
+        assumptions,
+        emotionalTone,
+        selfRole,
+        objectRole,
+        timeframe,
+        finalCastingQuestion: question,
+        selectedIntent: selectedQuestionIntent,
+      }),
+    [
+      rawQuestion,
+      clarifiedIntent,
+      knownFacts,
+      assumptions,
+      emotionalTone,
+      selfRole,
+      objectRole,
+      timeframe,
+      question,
+      selectedQuestionIntent,
+    ]
+  );
+
+  const questionForLogic = question || rawQuestion;
+
   const recommendedMethodId = useMemo(
-    () => recommendMethod(question),
-    [question]
+    () => recommendMethod(questionForLogic),
+    [questionForLogic]
   );
 
   const recommendedMethod = methods.find(
@@ -359,6 +412,10 @@ function App() {
     castingDate,
     castingTime
   );
+
+  if (!questionRefinement.readyToCast) {
+    warnings.push(`Question Refinement: ${questionRefinement.readinessLabel}.`);
+  }
 
   if (manualCalendarMode) {
     if (!manualMonthBranch.trim()) {
@@ -500,6 +557,11 @@ function App() {
     movingLines,
   });
 
+  const coinCastingSummary = useMemo(
+    () => buildCoinCastingSummary(coinCastingHistory),
+    [coinCastingHistory]
+  );
+
   const visibleSnapshots = useMemo(() => {
     const cleanSearch = snapshotSearch.trim().toLowerCase();
 
@@ -542,7 +604,15 @@ function App() {
     [compareSnapshotA, compareSnapshotB, canCompareSnapshots]
   );
 
-  const readingSummary = useMemo(
+  const compareSummary = useMemo(
+    () =>
+      canCompareSnapshots
+        ? buildSnapshotCompareSummary(compareSnapshotA, compareSnapshotB)
+        : null,
+    [compareSnapshotA, compareSnapshotB, canCompareSnapshots]
+  );
+
+  const baseReadingSummary = useMemo(
     () =>
       buildReadingSummary({
         question,
@@ -620,12 +690,22 @@ function App() {
     ]
   );
 
+  const readingSummary = useMemo(
+    () =>
+      `${buildQuestionRefinementSummary(
+        questionRefinement
+      )}\n\n${coinCastingSummary}\n\n${baseReadingSummary}`,
+    [questionRefinement, coinCastingSummary, baseReadingSummary]
+  );
+
   function updateLine(index, value) {
     setLines((currentLines) =>
       currentLines.map((line, lineIndex) =>
         lineIndex === index ? value : line
       )
     );
+
+    setCoinCastingHistory([]);
   }
 
   function updateLineBranch(index, value) {
@@ -655,7 +735,19 @@ function App() {
     setSavedSnapshots(storedSnapshots);
   }
 
+  function resetQuestionRefinement() {
+    setRawQuestion("");
+    setClarifiedIntent("");
+    setKnownFacts("");
+    setAssumptions("");
+    setEmotionalTone("");
+    setSelectedQuestionIntent("");
+  }
+
   function resetCurrentReading() {
+    resetQuestionRefinement();
+    setCoinCastingHistory([]);
+
     applyDefaultReadingState({
       setQuestion,
       setSelectedMethod,
@@ -692,6 +784,9 @@ function App() {
   }
 
   function loadPreset(preset) {
+    resetQuestionRefinement();
+    setCoinCastingHistory([]);
+
     applyPresetToAppState(preset, {
       setQuestion,
       setSelectedMethod,
@@ -722,9 +817,39 @@ function App() {
       setSnapshotStatus,
     });
 
+    setRawQuestion(preset.question || "");
+    setClarifiedIntent(preset.description || "");
+    setSelectedQuestionIntent("");
+
     setDeleteConfirmArmed(false);
     clearSnapshotEditModes();
     scrollToQuestionSection();
+  }
+
+  function useSuggestedFinalQuestion() {
+    if (!questionRefinement.suggestedFinalQuestion) {
+      setSnapshotStatus("Add a raw question before generating a final question.");
+      return;
+    }
+
+    setQuestion(questionRefinement.suggestedFinalQuestion);
+    setSnapshotStatus("Suggested final casting question applied.");
+    setDeleteConfirmArmed(false);
+  }
+
+  function castReadingWithCoins() {
+    const casting = castSixLinesWithCoins();
+
+    setLines(casting.lines);
+    setCoinCastingHistory(casting.results);
+    setCopied(false);
+    setSnapshotStatus(
+      `Coin casting completed. Moving lines: ${
+        casting.movingLines.length ? casting.movingLines.join(", ") : "none"
+      }.`
+    );
+    setDeleteConfirmArmed(false);
+    clearSnapshotEditModes();
   }
 
   async function copyReadingSummary() {
@@ -778,7 +903,7 @@ function App() {
 
   function saveCurrentSnapshot() {
     if (!question.trim()) {
-      setSnapshotStatus("Add a question before saving a reading.");
+      setSnapshotStatus("Add a final casting question before saving a reading.");
       setDeleteConfirmArmed(false);
       return;
     }
@@ -830,7 +955,17 @@ function App() {
   }
 
   function loadSnapshot(snapshot) {
-    setQuestion(snapshot.question || "");
+    const loadedQuestion = snapshot.question || "";
+
+    setRawQuestion(loadedQuestion);
+    setClarifiedIntent("");
+    setKnownFacts("");
+    setAssumptions("");
+    setEmotionalTone("");
+    setSelectedQuestionIntent("");
+    setCoinCastingHistory([]);
+
+    setQuestion(loadedQuestion);
     setSelectedMethod(snapshot.selectedMethod || "GLDM");
     setSelfRole(snapshot.selfRole || "");
     setObjectRole(snapshot.objectRole || "");
@@ -1109,47 +1244,104 @@ function App() {
       </section>
 
       <section className="panel" id="question-section">
-        <h2>1. Enter your question</h2>
-        <textarea
-          value={question}
-          onChange={(event) => {
-            setQuestion(event.target.value);
-            resetCopyAndStatus();
-          }}
-          placeholder="Example: Will I profit from this product launch within the next three months?"
-        />
-      </section>
+        <h2>1. Question Refinement Engine</h2>
+        <p className="section-note">
+          Clarify the question before casting so the method, Self/Object coding,
+          useful spirit, and final judgment have a clean target.
+        </p>
 
-      <section className="panel">
-        <h2>2. Choose the reading method</h2>
+        <label>
+          Raw Question
+          <textarea
+            value={rawQuestion}
+            onChange={(event) => {
+              setRawQuestion(event.target.value);
+              resetCopyAndStatus();
+            }}
+            placeholder="Example: Will this app make money?"
+          />
+        </label>
 
-        <div className="recommendation-box">
-          <strong>Recommended method:</strong> {recommendedMethod.id} —{" "}
-          {recommendedMethod.name}
-        </div>
-
-        <div className="method-grid">
-          {methods.map((item) => (
-            <button
-              key={item.id}
-              className={
-                selectedMethod === item.id ? "method-card active" : "method-card"
-              }
-              onClick={() => {
-                setSelectedMethod(item.id);
-                setManualFocus("");
+        <div className="field-grid">
+          <label>
+            Intent category
+            <select
+              value={selectedQuestionIntent}
+              onChange={(event) => {
+                setSelectedQuestionIntent(event.target.value);
                 resetCopyAndStatus();
               }}
             >
-              <strong>{item.id}</strong>
-              <span>{item.name}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+              {questionIntentOptions.map((option) => (
+                <option key={option.id || "auto"} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
 
-      <section className="panel">
-        <h2>3. Code the question</h2>
+          <label>
+            Clarified intent
+            <input
+              value={clarifiedIntent}
+              onChange={(event) => {
+                setClarifiedIntent(event.target.value);
+                resetCopyAndStatus();
+              }}
+              placeholder="Example: profit from the WWG"
+            />
+          </label>
+
+          <label>
+            Emotional tone
+            <select
+              value={emotionalTone}
+              onChange={(event) => {
+                setEmotionalTone(event.target.value);
+                resetCopyAndStatus();
+              }}
+            >
+              <option value="">Not selected</option>
+              <option value="Neutral">Neutral</option>
+              <option value="Hope">Hope</option>
+              <option value="Excitement">Excitement</option>
+              <option value="Doubt">Doubt</option>
+              <option value="Fear">Fear</option>
+              <option value="Pressure">Pressure</option>
+              <option value="Urgency">Urgency</option>
+              <option value="Fatigue">Fatigue</option>
+              <option value="Attachment">Attachment</option>
+              <option value="Shame">Shame</option>
+              <option value="Anger">Anger</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="field-grid">
+          <label>
+            Known facts
+            <textarea
+              value={knownFacts}
+              onChange={(event) => {
+                setKnownFacts(event.target.value);
+                resetCopyAndStatus();
+              }}
+              placeholder="Example: The app is built, deployed, and still being improved."
+            />
+          </label>
+
+          <label>
+            Assumptions to watch
+            <textarea
+              value={assumptions}
+              onChange={(event) => {
+                setAssumptions(event.target.value);
+                resetCopyAndStatus();
+              }}
+              placeholder="Example: I assume people will pay for it quickly."
+            />
+          </label>
+        </div>
 
         <div className="field-grid">
           <label>
@@ -1187,6 +1379,131 @@ function App() {
               placeholder="Example: next 3 months"
             />
           </label>
+        </div>
+
+        <label>
+          Final Casting Question
+          <textarea
+            value={question}
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              resetCopyAndStatus();
+            }}
+            placeholder="Example: Will this WWG app generate profit within the next three months?"
+          />
+        </label>
+
+        <div className="recommendation-box">
+          <strong>Suggested final question:</strong>{" "}
+          {questionRefinement.suggestedFinalQuestion || "Add a raw question."}
+        </div>
+
+        <button className="export-button" onClick={useSuggestedFinalQuestion}>
+          Use Suggested Final Question
+        </button>
+
+        <div className="score-row">
+          <span>Question Quality</span>
+          <strong>
+            {questionRefinement.clarityScore}/100 —{" "}
+            {questionRefinement.readinessLabel}
+          </strong>
+        </div>
+
+        <div className="recommendation-grid">
+          <div className="recommendation-card">
+            <strong>Detected Intent</strong>
+            <p>{questionRefinement.detectedIntent.label}</p>
+          </div>
+
+          <div className="recommendation-card">
+            <strong>Method Hint</strong>
+            <p>
+              {questionRefinement.methodHints.length
+                ? questionRefinement.methodHints.join(", ")
+                : "No method hint"}
+            </p>
+          </div>
+
+          <div className="recommendation-card">
+            <strong>Focus Hint</strong>
+            <p>
+              {questionRefinement.focusHints.length
+                ? questionRefinement.focusHints.join(", ")
+                : "No focus hint"}
+            </p>
+          </div>
+
+          <div className="recommendation-card">
+            <strong>Ready to Cast</strong>
+            <p>{questionRefinement.readyToCast ? "Yes" : "No"}</p>
+          </div>
+        </div>
+
+        {questionRefinement.warnings.length > 0 ? (
+          <ul className="warning-list">
+            {questionRefinement.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="success-message">
+            The question is clear enough to move toward casting.
+          </p>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>2. Choose the reading method</h2>
+
+        <div className="recommendation-box">
+          <strong>Recommended method:</strong> {recommendedMethod.id} —{" "}
+          {recommendedMethod.name}
+        </div>
+
+        <div className="method-grid">
+          {methods.map((item) => (
+            <button
+              key={item.id}
+              className={
+                selectedMethod === item.id ? "method-card active" : "method-card"
+              }
+              onClick={() => {
+                setSelectedMethod(item.id);
+                setManualFocus("");
+                resetCopyAndStatus();
+              }}
+            >
+              <strong>{item.id}</strong>
+              <span>{item.name}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel">
+        <h2>3. Question Coding Review</h2>
+
+        <div className="summary-card">
+          <p>
+            <strong>Final casting question:</strong>{" "}
+            {question.trim() ? question : "No final question entered yet."}
+          </p>
+          <p>
+            <strong>Self:</strong> {selfRole.trim() ? selfRole : "Not set yet."}
+          </p>
+          <p>
+            <strong>Object:</strong>{" "}
+            {objectRole.trim() ? objectRole : "Not set yet."}
+          </p>
+          <p>
+            <strong>Timeframe:</strong>{" "}
+            {timeframe.trim() ? timeframe : "Not set yet."}
+          </p>
+          <p>
+            <strong>Detected intent:</strong>{" "}
+            {questionRefinement.detectedIntent.label}
+          </p>
         </div>
       </section>
 
@@ -1391,7 +1708,7 @@ function App() {
         <h2>5. Question Quality Check</h2>
 
         <div className="score-row">
-          <span>Clarity Score</span>
+          <span>Overall Clarity Score</span>
           <strong>{clarityScore}/100</strong>
         </div>
 
@@ -1409,11 +1726,49 @@ function App() {
       </section>
 
       <section className="panel">
-        <h2>6. Casting Engine</h2>
+        <h2>6. Line Entry / Chart Builder</h2>
         <p className="section-note">
-          Set six lines from bottom to top. Moving lines transform into the
+          Cast six lines automatically with the three-coin method, or manually
+          enter six lines from bottom to top. Moving lines transform into the
           second hexagram.
         </p>
+
+        <div className="recommendation-box">
+          <strong>Casting mode:</strong>{" "}
+          {coinCastingHistory.length ? "Three-Coin Casting" : "Manual Line Entry"}
+        </div>
+
+        <button className="export-button" onClick={castReadingWithCoins}>
+          Cast Reading with Three Coins
+        </button>
+
+        {coinCastingHistory.length > 0 && (
+          <div className="rule-list">
+            {coinCastingHistory.map((result) => (
+              <div key={result.lineNumber} className="rule-card">
+                <strong>{formatCoinCastingLine(result)}</strong>
+                <p>{result.meaning}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="recommendation-grid">
+          {coinCastingLegend.map((item) => (
+            <div key={item.total} className="recommendation-card">
+              <strong>
+                {item.total} — {item.label}
+              </strong>
+              <p>
+                Coins: {item.coins}
+                <br />
+                Moving: {item.moving ? "Yes" : "No"}
+                <br />
+                Transforms to: {item.transformsTo}
+              </p>
+            </div>
+          ))}
+        </div>
 
         <div className="casting-layout">
           <div className="line-controls">
@@ -1829,7 +2184,7 @@ function App() {
         <div className="summary-card">
           <p>
             <strong>Question:</strong>{" "}
-            {question.trim() ? question : "No question entered yet."}
+            {question.trim() ? question : "No final question entered yet."}
           </p>
           <p>
             <strong>Selected method:</strong> {method.name}
@@ -2079,6 +2434,32 @@ function App() {
             </p>
           ) : canCompareSnapshots ? (
             <div style={{ marginTop: "22px" }}>
+              {compareSummary && (
+                <div
+                  style={{
+                    marginBottom: "22px",
+                    padding: "18px",
+                    borderRadius: "20px",
+                    border: "1px solid rgba(240, 180, 95, 0.55)",
+                    background: "rgba(78, 55, 30, 0.35)",
+                    textAlign: "left",
+                  }}
+                >
+                  <h4
+                    style={{
+                      margin: "0 0 8px",
+                      color: "#f0b45f",
+                      fontSize: "1.1rem",
+                    }}
+                  >
+                    Compare Summary
+                  </h4>
+                  <p style={{ margin: 0, color: "#f4e5d0" }}>
+                    {compareSummary.summaryText}
+                  </p>
+                </div>
+              )}
+
               {compareRows.map((section) => (
                 <div
                   key={section.section}
