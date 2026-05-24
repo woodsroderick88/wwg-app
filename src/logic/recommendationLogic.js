@@ -1,40 +1,37 @@
-function clean(value) {
-  return String(value || "").trim();
-}
-
-function lower(value) {
-  return clean(value).toLowerCase();
-}
-
-function sentenceStart(value) {
-  const text = clean(value);
-
-  if (!text) {
-    return text;
-  }
-
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
-
-function getFocusConditionText(focusRows) {
+function getFocusLineNumbers(focusRows) {
   if (!Array.isArray(focusRows) || focusRows.length === 0) {
     return "";
   }
 
-  return focusRows
-    .map((row) =>
-      [
-        row.condition?.summary,
-        ...(Array.isArray(row.condition?.notes) ? row.condition.notes : []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-    )
-    .join(" ");
+  return focusRows.map((row) => row.lineNumber).join(", ");
 }
 
-function hasText(text, keyword) {
-  return lower(text).includes(lower(keyword));
+function hasSupportedFocus(focusRows) {
+  return focusRows.some((row) => row.condition?.summary === "Supported");
+}
+
+function hasWeakenedFocus(focusRows) {
+  return focusRows.some((row) => row.condition?.summary === "Weakened");
+}
+
+function hasClashedFocus(focusRows) {
+  return focusRows.some((row) =>
+    row.condition?.notes?.some((note) =>
+      String(note).toLowerCase().includes("clashed")
+    )
+  );
+}
+
+function hasVoidFocus(focusRows) {
+  return focusRows.some((row) =>
+    row.condition?.notes?.some((note) =>
+      String(note).toLowerCase().includes("void")
+    )
+  );
+}
+
+function hasMovingFocus(focusRows) {
+  return focusRows.some((row) => row.moving);
 }
 
 function getMovingLineText(movingLines) {
@@ -42,179 +39,67 @@ function getMovingLineText(movingLines) {
     return "No moving lines.";
   }
 
-  return `Moving line${movingLines.length === 1 ? "" : "s"}: ${movingLines.join(
-    ", "
-  )}.`;
+  return movingLines.length === 1
+    ? `Moving line: ${movingLines[0]}.`
+    : `Moving lines: ${movingLines.join(", ")}.`;
 }
 
-function hasMovingLines(movingLines) {
-  return Array.isArray(movingLines) && movingLines.length > 0;
-}
-
-function getMethodPlainName(selectedMethod, selectedFocus) {
-  if (selectedMethod === "RIDM") {
-    if (
-      selectedFocus === "Object-line" ||
-      selectedFocus === "Object" ||
-      selectedFocus === "Officer-line"
-    ) {
-      return "relationship stability, emotional development, and long-term connection";
-    }
-
-    return "relationship, development, health, or progression";
-  }
-
-  const methodMap = {
-    GLDM: "gain, loss, money, resources, and profit",
-    TDM: "timing and arrival",
-    CDM: "competition, opposition, and rivals",
-    ADM: "overall auspiciousness",
-  };
-
-  return methodMap[selectedMethod] || "the selected matter";
-}
-
-function getFocusPlainMeaning(selectedFocus) {
-  const focusMap = {
-    "Asset-line": "money, profit, resources, goods, or controllable value",
-    "Officer-line":
-      "authority, pressure, discipline, career, illness, obligation, or relationship structure",
-    "Parent-line": "documents, protection, support, property, or information",
-    "Offspring-line":
-      "output, products, creativity, relief, children, or results",
-    "Sibling-line": "competition, peers, expenses, rivals, or resource drain",
-    "Object-line": "relationship or other-party",
-    "Self-line": "self-position, personal capacity, or the person asking",
-    Object: "relationship or other-party",
-    Self: "self-position, personal capacity, or the person asking",
-  };
-
-  return focusMap[selectedFocus] || "selected useful-spirit";
-}
-
-function getFocusLineLabels(focusRows) {
-  if (!Array.isArray(focusRows) || focusRows.length === 0) {
-    return "";
-  }
-
-  return focusRows.map((row) => `Line ${row.lineNumber}`).join(", ");
-}
-
-function isRelationshipReading(selectedMethod, selectedFocus) {
-  return (
-    selectedMethod === "RIDM" &&
-    (selectedFocus === "Object-line" ||
-      selectedFocus === "Object" ||
-      selectedFocus === "Officer-line")
-  );
-}
-
-function buildSignals({ selectedMethod, selectedFocus, focusRows, movingLines, clarityScore }) {
-  const conditionText = getFocusConditionText(focusRows);
+function buildBaseSignals({ selectedFocus, focusRows, movingLines, clarityScore }) {
+  const focusLineNumbers = getFocusLineNumbers(focusRows);
+  const supported = hasSupportedFocus(focusRows);
+  const weakened = hasWeakenedFocus(focusRows);
+  const clashed = hasClashedFocus(focusRows);
+  const voided = hasVoidFocus(focusRows);
+  const movingFocus = hasMovingFocus(focusRows);
+  const hasMovingLines = Array.isArray(movingLines) && movingLines.length > 0;
 
   const supportingSigns = [];
   const warningSigns = [];
 
-  if (!Array.isArray(focusRows) || focusRows.length === 0) {
+  if (focusRows.length > 0) {
+    supportingSigns.push(
+      `${selectedFocus} is visible on Line ${focusLineNumbers}, so the matter is present in the chart.`
+    );
+  } else {
     warningSigns.push(
       `${selectedFocus} is not visible in the current chart layer, so the matter is harder to judge at this MVP stage.`
     );
-  } else if (isRelationshipReading(selectedMethod, selectedFocus)) {
+  }
+
+  if (supported) {
     supportingSigns.push(
-      `The relationship focus is visible on ${getFocusLineLabels(
-        focusRows
-      )}, so the relationship matter is present in the chart.`
-    );
-  } else {
-    supportingSigns.push(
-      `${selectedFocus} is visible on ${getFocusLineLabels(
-        focusRows
-      )}, so the matter is present in the chart.`
+      `${selectedFocus} is supported, which gives the matter usable strength.`
     );
   }
 
-  if (hasText(conditionText, "supported")) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      supportingSigns.push(
-        "The relationship focus is supported, which gives the connection usable strength."
-      );
-    } else {
-      supportingSigns.push(
-        `${selectedFocus} is supported, which gives the matter usable strength.`
-      );
-    }
+  if (movingFocus) {
+    supportingSigns.push(
+      `${selectedFocus} is connected to a moving line, showing activity, change, or development.`
+    );
   }
 
-  if (hasText(conditionText, "active moving line")) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      supportingSigns.push(
-        "The relationship focus is connected to movement, showing active development or emotional change."
-      );
-    } else {
-      supportingSigns.push(
-        `${selectedFocus} is connected to a moving line, showing activity, change, or development.`
-      );
-    }
+  if (weakened) {
+    warningSigns.push(
+      `${selectedFocus} is weakened, which can show low strength, delay, or reduced effectiveness.`
+    );
   }
 
-  if (hasText(conditionText, "clashed")) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      warningSigns.push(
-        "The relationship focus is clashed, which can show tension, disruption, emotional pressure, or instability."
-      );
-    } else {
-      warningSigns.push(
-        `${selectedFocus} is clashed, which shows disruption, pressure, instability, delay, or extra effort.`
-      );
-    }
+  if (clashed) {
+    warningSigns.push(
+      `${selectedFocus} is clashed, which shows disruption, pressure, instability, delay, or extra effort.`
+    );
   }
 
-  if (hasText(conditionText, "void")) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      warningSigns.push(
-        "The relationship focus is affected by void, so the connection may feel delayed, distant, unclear, or not fully available yet."
-      );
-    } else {
-      warningSigns.push(
-        `${selectedFocus} is affected by void, so the matter may be weak, delayed, absent, or not fully available yet.`
-      );
-    }
+  if (voided) {
+    warningSigns.push(
+      `${selectedFocus} is void, which can show incompleteness, delay, emptiness, or a matter not yet fully available.`
+    );
   }
 
-  if (hasText(conditionText, "weak")) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      warningSigns.push(
-        "The relationship focus appears weak, so the connection may need more care, presence, and consistency."
-      );
-    } else {
-      warningSigns.push(
-        `${selectedFocus} appears weak, so the matter may not have enough strength yet.`
-      );
-    }
-  }
-
-  if (hasText(conditionText, "damaged")) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      warningSigns.push(
-        "The relationship focus is damaged, so the connection may face emotional strain, distance, or instability."
-      );
-    } else {
-      warningSigns.push(
-        `${selectedFocus} is damaged, so the matter may face loss, blockage, or instability.`
-      );
-    }
-  }
-
-  if (!hasMovingLines(movingLines)) {
-    if (isRelationshipReading(selectedMethod, selectedFocus)) {
-      warningSigns.push(
-        "There are no moving lines, so the relationship appears static. This does not make the reading negative, but it means progress may require intentional communication and consistent effort."
-      );
-    } else {
-      warningSigns.push(
-        "There are no moving lines, so the chart is static. This does not make the reading invalid, but it means the matter may require deliberate action before visible change appears."
-      );
-    }
+  if (!hasMovingLines) {
+    warningSigns.push(
+      "There are no moving lines, so the chart is static. This does not make the reading invalid, but it means the matter may require deliberate action before visible change appears."
+    );
   }
 
   if (clarityScore < 70) {
@@ -224,521 +109,534 @@ function buildSignals({ selectedMethod, selectedFocus, focusRows, movingLines, c
   }
 
   return {
+    focusLineNumbers,
+    supported,
+    weakened,
+    clashed,
+    voided,
+    movingFocus,
+    hasMovingLines,
     supportingSigns,
     warningSigns,
   };
 }
 
-function classifyJudgment({
+function getConfidence({
   focusRows,
-  conditionText,
-  movingLines,
-  supportingSigns,
-  warningSigns,
+  supported,
+  weakened,
+  clashed,
+  voided,
+  movingFocus,
+  hasMovingLines,
   clarityScore,
 }) {
-  const focusVisible = Array.isArray(focusRows) && focusRows.length > 0;
-  const supported = hasText(conditionText, "supported");
-  const active = hasText(conditionText, "active moving line");
-  const clashed = hasText(conditionText, "clashed");
-  const voided = hasText(conditionText, "void");
-  const weak = hasText(conditionText, "weak");
-  const damaged = hasText(conditionText, "damaged");
-  const staticChart = !hasMovingLines(movingLines);
-
-  if (clarityScore < 50) {
-    return {
-      label: "Too unclear to judge",
-      confidence: "Low",
-      polarity: "unclear",
-    };
+  if (clarityScore < 50 || focusRows.length === 0) {
+    return "Low";
   }
 
-  if (!focusVisible) {
-    return {
-      label: "Too unclear to judge",
-      confidence: "Low",
-      polarity: "unclear",
-    };
+  if (supported && movingFocus && !clashed && !voided && clarityScore >= 80) {
+    return "High";
   }
 
-  if (staticChart) {
-    if (supported && !clashed && !voided && !weak && !damaged) {
-      return {
-        label: "Static / Slow Favorable",
-        confidence: "Medium",
-        polarity: "static-positive",
-      };
-    }
-
-    if (supported && (clashed || voided || weak || damaged)) {
-      return {
-        label: "Static / Mixed Signal",
-        confidence: "Medium-Low",
-        polarity: "static-mixed",
-      };
-    }
-
-    if (!supported && !voided && !weak && !damaged) {
-      return {
-        label: "Static / Needs Activation",
-        confidence: "Medium-Low",
-        polarity: "static-neutral",
-      };
-    }
-
-    return {
-      label: "Static / Weak Signal",
-      confidence: "Medium-Low",
-      polarity: "static-negative",
-    };
+  if ((supported || hasMovingLines) && !weakened && clarityScore >= 70) {
+    return "Medium-High";
   }
 
-  if (supported && active && !clashed && !voided && !weak && !damaged) {
-    return {
-      label: "Strong Yes",
-      confidence: "High",
-      polarity: "positive",
-    };
+  if (clashed || voided || weakened || !hasMovingLines) {
+    return "Medium-Low";
   }
 
-  if (supported && !clashed && !voided && !damaged) {
-    return {
-      label: "Cautious Yes",
-      confidence: "Medium-High",
-      polarity: "positive",
-    };
+  return "Medium";
+}
+
+function getFinalJudgment({
+  focusRows,
+  supported,
+  weakened,
+  clashed,
+  voided,
+  movingFocus,
+  hasMovingLines,
+  clarityScore,
+}) {
+  if (clarityScore < 50 || focusRows.length === 0) {
+    return "Too unclear to judge";
   }
 
-  if (supported && (clashed || voided || damaged || weak)) {
-    return {
-      label: "Cautious Yes",
-      confidence: "Medium",
-      polarity: "mixed-positive",
-    };
+  if (supported && movingFocus && !weakened && !clashed && !voided) {
+    return "Strong Yes";
   }
 
-  if (!supported && active && !voided && !damaged) {
-    return {
-      label: "Mixed / Unstable",
-      confidence: "Medium",
-      polarity: "mixed",
-    };
+  if ((supported || movingFocus) && !weakened && !voided) {
+    return clashed ? "Cautious Yes" : "Favorable";
   }
 
-  if (voided || damaged || weak) {
-    return {
-      label: "Weak No",
-      confidence: "Medium",
-      polarity: "negative",
-    };
+  if (!hasMovingLines) {
+    return "Static / Needs Activation";
   }
 
-  if (supportingSigns.length > warningSigns.length) {
-    return {
-      label: "Cautious Yes",
-      confidence: "Medium",
-      polarity: "mixed-positive",
-    };
+  if (weakened || clashed || voided) {
+    return "Uncertain / Needs Support";
   }
 
-  if (warningSigns.length > supportingSigns.length) {
-    return {
-      label: "Mixed / Unstable",
-      confidence: "Medium",
-      polarity: "mixed",
-    };
+  return "Cautious Yes";
+}
+
+function buildHousingRecommendation({
+  selectedFocus,
+  focusRows,
+  focusSummary,
+  ruleConclusion,
+  movingLines,
+  clarityScore,
+}) {
+  const signals = buildBaseSignals({
+    selectedFocus,
+    focusRows,
+    movingLines,
+    clarityScore,
+  });
+
+  const finalJudgment = getFinalJudgment({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  const confidence = getConfidence({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  let plainMeaning =
+    "The housing, shelter, approval, document, or support matter is present, but the signal needs practical confirmation. Continue the application process and verify requirements, documents, eligibility, waitlist status, and follow-up steps.";
+
+  if (finalJudgment === "Strong Yes") {
+    plainMeaning =
+      "The chart gives a strong favorable signal for housing approval, shelter support, or document-based progress. The Parent-line is visible, supported, and active, so the matter has real strength.";
+  } else if (finalJudgment === "Cautious Yes" || finalJudgment === "Favorable") {
+    plainMeaning =
+      "The chart gives a cautiously favorable signal for housing progress. The support/application matter is present, but it still needs follow-through, paperwork, eligibility confirmation, and timing support.";
+  } else if (finalJudgment === "Static / Needs Activation") {
+    plainMeaning =
+      "The housing matter is present, but the chart is static. This suggests the opportunity exists, but progress may depend on active application steps, document submission, follow-up calls, appointments, or waiting-list movement.";
+  } else if (finalJudgment === "Too unclear to judge") {
+    plainMeaning =
+      "The chart is not clear enough for a reliable housing judgment yet. Complete the question, calendar, and line setup before relying on the result.";
   }
 
   return {
-    label: "Mixed / Unstable",
-    confidence: "Medium",
-    polarity: "mixed",
+    result: finalJudgment,
+    finalJudgment,
+    confidence,
+    plainMeaning,
+    reason: plainMeaning,
+    risk:
+      signals.warningSigns.length > 0
+        ? `Warning signs: ${signals.warningSigns.join(" ")}`
+        : "Warning signs: No major warning signs are visible in the current MVP layer, but housing approval still depends on real-world eligibility, paperwork, availability, and agency timing.",
+    supportingSigns:
+      signals.supportingSigns.length > 0
+        ? signals.supportingSigns
+        : [
+            ruleConclusion ||
+              focusSummary ||
+              "The housing matter is present in the chart, but more rule layers are needed.",
+          ],
+    warningSigns:
+      signals.warningSigns.length > 0
+        ? signals.warningSigns
+        : [
+            "No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
+          ],
+    action:
+      "Keep moving the housing process forward. Apply, gather documents, verify eligibility, ask about waitlist timing, save confirmation numbers, and follow up consistently instead of waiting passively.",
+    nextCheck: `Next check: compare the Parent-line against Shi/Ying, moving lines, transformed hexagram, application documents, void/clash status, and hidden/flying spirit logic. ${getMovingLineText(
+      movingLines
+    )}`,
   };
 }
 
-function buildRelationshipPlainMeaning({
-  judgment,
-  selectedFocus,
-  conditionText,
-  focusRows,
-}) {
-  const supported = hasText(conditionText, "supported");
-  const clashed = hasText(conditionText, "clashed");
-  const voided = hasText(conditionText, "void");
-  const weak = hasText(conditionText, "weak");
-  const damaged = hasText(conditionText, "damaged");
-  const active = hasText(conditionText, "active moving line");
-
-  if (!Array.isArray(focusRows) || focusRows.length === 0) {
-    return "The relationship focus is not visible enough in this MVP layer. Treat the reading as incomplete until deeper palace, Shi/Ying, and hidden-spirit rules are added.";
-  }
-
-  if (judgment.label === "Strong Yes") {
-    return "The relationship shows a strong favorable signal. The connection is present, supported, and active, so stability and positive development have real strength.";
-  }
-
-  if (judgment.label === "Cautious Yes") {
-    if (supported && clashed) {
-      return "The relationship has a favorable signal, but it is not fully smooth. The connection is present and supported, yet there may be tension or disruption that requires patience, communication, and emotional follow-through.";
-    }
-
-    if (supported && voided) {
-      return "The relationship has potential, but the connection may feel delayed, unclear, or not fully available yet. Stability may improve with time and consistent effort.";
-    }
-
-    if (supported && active) {
-      return "The relationship has a favorable signal and shows active development. It still needs practical confirmation through consistent communication, trust-building, and steady emotional presence.";
-    }
-
-    return "The relationship is present and has a cautiously favorable signal, but stability is not guaranteed by itself. Continued communication, consistency, and emotional follow-through matter.";
-  }
-
-  if (judgment.label === "Static / Slow Favorable") {
-    return "The relationship has a quiet favorable signal. It may remain stable, but progress may be slow and will likely depend on steady communication, patience, and consistent emotional effort.";
-  }
-
-  if (judgment.label === "Static / Needs Activation") {
-    return "The relationship is present, but the chart is static. Stability may require active communication, shared time, reassurance, and deliberate effort rather than waiting for the connection to improve by itself.";
-  }
-
-  if (judgment.label === "Static / Mixed Signal") {
-    return "The relationship is present, but the signal is mixed and static. Stability may be possible, but it needs care, clearer communication, and better emotional conditions.";
-  }
-
-  if (judgment.label === "Static / Weak Signal") {
-    return "The relationship is not showing enough strength yet. Do not rely on stability without effort; watch whether communication, consistency, and mutual care improve.";
-  }
-
-  if (judgment.label === "Mixed / Unstable") {
-    return "The relationship is active but unstable. There may be development, but the outcome should not be treated as settled. Communication and emotional consistency are especially important.";
-  }
-
-  if (judgment.label === "Weak No") {
-    return "The relationship signal appears weak or damaged. Stability may be difficult unless the emotional conditions improve.";
-  }
-
-  if (weak || damaged || voided) {
-    return `The relationship focus needs better support before stability can be trusted. The ${selectedFocus} is present, but the conditions are not strong enough yet.`;
-  }
-
-  return "The relationship matter is present, but the app needs deeper palace, Shi/Ying, and hidden-spirit rules before giving a stronger relationship judgment.";
-}
-
-function buildPlainMeaning({
-  judgment,
-  selectedMethod,
+function buildMoneyRecommendation({
   selectedFocus,
   focusRows,
-  conditionText,
-}) {
-  const relationshipReading = isRelationshipReading(selectedMethod, selectedFocus);
-
-  if (relationshipReading) {
-    return buildRelationshipPlainMeaning({
-      judgment,
-      selectedFocus,
-      conditionText,
-      focusRows,
-    });
-  }
-
-  const matter = getFocusPlainMeaning(selectedFocus);
-  const methodMeaning = getMethodPlainName(selectedMethod, selectedFocus);
-  const supported = hasText(conditionText, "supported");
-  const clashed = hasText(conditionText, "clashed");
-  const voided = hasText(conditionText, "void");
-  const weak = hasText(conditionText, "weak");
-  const damaged = hasText(conditionText, "damaged");
-  const active = hasText(conditionText, "active moving line");
-
-  if (!Array.isArray(focusRows) || focusRows.length === 0) {
-    return `The chart does not show the main ${matter} factor clearly enough in this MVP layer. Treat the result as incomplete until deeper palace, hidden-spirit, and calendar rules are added.`;
-  }
-
-  if (judgment.label === "Static / Slow Favorable") {
-    return `The chart gives a quiet but favorable signal for ${methodMeaning}. The ${selectedFocus} is visible and supported, but there are no moving lines, so the matter may develop slowly or require steady practical effort before results become visible.`;
-  }
-
-  if (judgment.label === "Static / Needs Activation") {
-    return `${sentenceStart(
-      matter
-    )} factor is present, but the chart is static. This means the matter exists, but it is not showing strong active movement yet. It may require deliberate action before the desired result appears.`;
-  }
-
-  if (judgment.label === "Static / Mixed Signal") {
-    return `The chart shows the matter is present, but the signal is static and mixed. The ${selectedFocus} has some support, but it also has pressure or weakness, so the outcome may require correction, effort, or better conditions.`;
-  }
-
-  if (judgment.label === "Static / Weak Signal") {
-    return `The chart is static and the ${selectedFocus} is not strong enough yet. The desired result may not develop unless the conditions are improved or activated by practical action.`;
-  }
-
-  if (judgment.label === "Strong Yes") {
-    return `The chart gives a strong favorable signal for ${methodMeaning}. The matter is visible, supported, and active, so the outcome has real strength.`;
-  }
-
-  if (judgment.label === "Cautious Yes") {
-    if (supported && clashed) {
-      return `The chart shows real potential for ${methodMeaning}, but the signal is not fully stable. The ${selectedFocus} is visible and supported, yet it is also clashed, so the result may require extra effort, correction, or stronger follow-through.`;
-    }
-
-    if (supported && voided) {
-      return `The chart shows potential for ${methodMeaning}, but the result may be delayed or not fully available yet because the ${selectedFocus} is affected by void.`;
-    }
-
-    if (supported && active) {
-      return `The chart gives a favorable signal for ${methodMeaning}. The ${selectedFocus} is visible, supported, and active, but the app should still wait for deeper confirmation before treating this as guaranteed.`;
-    }
-
-    return `The chart gives a favorable but cautious signal for ${methodMeaning}. The matter is present and usable, but not strong enough yet to call it guaranteed.`;
-  }
-
-  if (judgment.label === "Mixed / Unstable") {
-    return "The chart shows movement or presence, but the signal is unstable. The matter may develop, but there are enough conflicts or missing supports that the outcome should not be treated as settled.";
-  }
-
-  if (judgment.label === "Weak No") {
-    return "The chart shows the matter is weak, damaged, void, or not sufficiently supported. The outcome is unlikely to be strong unless conditions change.";
-  }
-
-  if (judgment.label === "Blocked") {
-    return "The chart shows blockage or strong damage around the matter. This points against the desired outcome unless a later reading shows improvement.";
-  }
-
-  if (weak || damaged || voided) {
-    return `The chart is not strong enough for a reliable favorable judgment. The ${selectedFocus} needs better support before the desired outcome can be trusted.`;
-  }
-
-  return "The chart is not clear enough for a reliable final judgment yet. Improve the question, calendar settings, and line data before relying on the result.";
-}
-
-function buildAction({
-  judgment,
-  selectedMethod,
-  selectedFocus,
-  conditionText,
-}) {
-  const clashed = hasText(conditionText, "clashed");
-  const voided = hasText(conditionText, "void");
-  const relationshipReading = isRelationshipReading(selectedMethod, selectedFocus);
-
-  if (selectedMethod === "GLDM") {
-    if (judgment.label === "Strong Yes") {
-      return "Move forward actively. Strengthen the offer, promote it, and track money signals closely because the chart supports real profit potential.";
-    }
-
-    if (judgment.label === "Cautious Yes") {
-      if (clashed) {
-        return "Keep building and promoting, but do not assume passive profit. Treat the timeframe as a validation window: improve positioning, get users, test pricing, and remove friction.";
-      }
-
-      if (voided) {
-        return "Keep preparing the offer, but watch for delay. Focus on making the product clearer and easier to buy before expecting steady profit.";
-      }
-
-      return "Continue the project and look for practical traction. Push for users, feedback, and revenue tests before making a final business decision.";
-    }
-
-    if (judgment.label === "Static / Slow Favorable") {
-      return "Keep going, but expect gradual progress rather than sudden profit. Use the timeframe to build traction, improve the offer, test pricing, and make the path to payment clearer.";
-    }
-
-    if (judgment.label === "Static / Needs Activation") {
-      return "Do not wait passively. Activate the money path through marketing, clearer positioning, user feedback, pricing tests, and direct outreach.";
-    }
-
-    if (judgment.label === "Static / Mixed Signal") {
-      return "Proceed carefully. The profit factor exists, but the path is not clean yet. Reduce friction, improve the offer, and look for stronger traction before expecting reliable income.";
-    }
-
-    if (judgment.label === "Static / Weak Signal") {
-      return "Do not rely on near-term profit yet. Improve the app, audience, offer, and sales path first, then cast again when the conditions are stronger.";
-    }
-
-    if (judgment.label === "Mixed / Unstable") {
-      return "Do not overcommit yet. Test demand, reduce costs, improve the offer, and look for stronger confirmation before relying on profit.";
-    }
-
-    if (judgment.label === "Weak No") {
-      return "Avoid expecting near-term profit without changing the conditions. Improve the product, audience, offer, and sales path first.";
-    }
-  }
-
-  if (relationshipReading) {
-    if (judgment.label === "Strong Yes") {
-      return "Move forward with confidence, while still protecting the relationship through honest communication, consistency, and emotional presence.";
-    }
-
-    if (judgment.label === "Cautious Yes") {
-      return "Move forward carefully. Keep communication steady, show consistency, and watch for practical confirmation that the relationship is developing well.";
-    }
-
-    if (judgment.label === "Static / Slow Favorable") {
-      return "Move steadily and patiently. Keep communication consistent, build trust, and avoid forcing sudden change.";
-    }
-
-    if (judgment.label === "Static / Needs Activation") {
-      return "Do not assume the relationship will improve by itself. Create movement through honest communication, consistency, shared time, and clear emotional presence.";
-    }
-
-    if (judgment.label === "Static / Mixed Signal") {
-      return "Proceed gently. The relationship matter is present, but it needs care, communication, and better conditions before relying on stability.";
-    }
-
-    if (judgment.label === "Static / Weak Signal") {
-      return "Do not rely on stability without effort. Strengthen communication, clarify expectations, and watch whether the other person responds consistently.";
-    }
-
-    if (judgment.label === "Mixed / Unstable") {
-      return "Move slowly and observe carefully. The relationship may develop, but stability needs stronger communication and consistency before relying on it.";
-    }
-
-    if (judgment.label === "Weak No") {
-      return "Do not assume stability yet. Focus on honest communication, clarity, and whether both people are consistently showing up.";
-    }
-  }
-
-  if (judgment.label === "Static / Slow Favorable") {
-    return "Move forward steadily. The matter is favorable but slow, so focus on consistent practical action.";
-  }
-
-  if (judgment.label === "Static / Needs Activation") {
-    return "Take deliberate action to activate the matter. Do not wait for the situation to move by itself.";
-  }
-
-  if (judgment.label === "Static / Mixed Signal") {
-    return "Proceed carefully and improve the weak points before relying on the outcome.";
-  }
-
-  if (judgment.label === "Static / Weak Signal") {
-    return "Do not rely on the desired outcome yet. Conditions need to be strengthened first.";
-  }
-
-  if (judgment.label === "Strong Yes") {
-    return "Move forward with confidence, while still checking the practical details.";
-  }
-
-  if (judgment.label === "Cautious Yes") {
-    return "Move forward carefully. The signal is favorable, but it still needs practical confirmation.";
-  }
-
-  if (judgment.label === "Mixed / Unstable") {
-    return "Pause before making a major decision. Improve the conditions and look for clearer confirmation.";
-  }
-
-  if (judgment.label === "Weak No") {
-    return "Do not rely on the desired outcome yet. Conditions need to improve first.";
-  }
-
-  return "Clarify the question and complete the missing chart rules before making a final decision.";
-}
-
-function buildNextCheck({
-  selectedMethod,
-  selectedFocus,
+  focusSummary,
+  ruleConclusion,
   movingLines,
+  clarityScore,
 }) {
-  const movingText = getMovingLineText(movingLines);
+  const signals = buildBaseSignals({
+    selectedFocus,
+    focusRows,
+    movingLines,
+    clarityScore,
+  });
 
-  if (selectedMethod === "GLDM") {
-    if (!hasMovingLines(movingLines)) {
-      return `Next check: because the chart is static, review whether the ${selectedFocus} is supported, void, clashed, or weak. Then check true prosperity rules, Shi/Ying placement, and hidden/flying spirit logic. ${movingText}`;
-    }
+  const finalJudgment = getFinalJudgment({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
 
-    return `Next check: analyze the ${selectedFocus} against moving lines, transformed hexagram, true prosperity rules, and hidden/flying spirit logic. ${movingText}`;
+  const confidence = getConfidence({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  let plainMeaning =
+    "Money, profit, resources, goods, or controllable value factor is present, but the chart needs more confirmation before treating it as a strong gain signal.";
+
+  if (finalJudgment === "Static / Needs Activation") {
+    plainMeaning =
+      "Money, profit, resources, goods, or controllable value factor is present, but the chart is static. This means the matter exists, but it is not showing strong active movement yet. It may require deliberate action before the desired result appears.";
+  } else if (finalJudgment === "Strong Yes") {
+    plainMeaning =
+      "The chart gives a strong favorable signal for gain, money, resources, or profit. The Asset-line is visible, supported, and active.";
+  } else if (finalJudgment === "Cautious Yes" || finalJudgment === "Favorable") {
+    plainMeaning =
+      "The chart shows real potential for gain, money, resources, or profit, but the signal is not fully clean. Extra effort, timing, or correction may still be needed.";
   }
 
-  if (selectedMethod === "TDM") {
-    return `Next check: compare moving lines, day/month strength, and transformed lines to estimate timing. ${movingText}`;
+  return {
+    result: finalJudgment,
+    finalJudgment,
+    confidence,
+    plainMeaning,
+    reason: plainMeaning,
+    risk:
+      signals.warningSigns.length > 0
+        ? `Warning signs: ${signals.warningSigns.join(" ")}`
+        : "Warning signs: No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
+    supportingSigns: signals.supportingSigns,
+    warningSigns:
+      signals.warningSigns.length > 0
+        ? signals.warningSigns
+        : [
+            "No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
+          ],
+    action:
+      "Do not wait passively. Activate the money path through clearer positioning, direct action, pricing tests, outreach, follow-up, and removing friction.",
+    nextCheck: `Next check: analyze the Asset-line against moving lines, transformed hexagram, true prosperity rules, Shi/Ying placement, and hidden/flying spirit logic. ${getMovingLineText(
+      movingLines
+    )}`,
+  };
+}
+
+function buildTimingRecommendation({
+  selectedFocus,
+  focusRows,
+  focusSummary,
+  ruleConclusion,
+  movingLines,
+  clarityScore,
+}) {
+  const signals = buildBaseSignals({
+    selectedFocus,
+    focusRows,
+    movingLines,
+    clarityScore,
+  });
+
+  const finalJudgment = getFinalJudgment({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  const confidence = getConfidence({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  let plainMeaning =
+    "The timing signal is present but not complete. Moving lines, void-filling, day/month activation, and transformed lines need deeper comparison.";
+
+  if (!signals.hasMovingLines) {
+    plainMeaning =
+      "The chart does not show a clear active timing trigger in this MVP layer. This does not mean the event cannot happen, but the current chart is static and timing is harder to judge.";
+  } else if (finalJudgment === "Strong Yes") {
+    plainMeaning =
+      "The chart gives a strong favorable timing signal. The matter is visible, supported, and active.";
+  } else if (finalJudgment === "Cautious Yes" || finalJudgment === "Favorable") {
+    plainMeaning =
+      "The chart gives a cautiously favorable timing signal. There is movement, but the timing still needs confirmation through day/month, void, clash, and transformed-line rules.";
   }
 
-  if (selectedMethod === "RIDM") {
-    return `Next check: compare the relationship focus against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic. ${movingText}`;
+  return {
+    result: finalJudgment,
+    finalJudgment,
+    confidence,
+    plainMeaning,
+    reason: plainMeaning,
+    risk:
+      signals.warningSigns.length > 0
+        ? `Warning signs: ${signals.warningSigns.join(" ")}`
+        : "Warning signs: No major warning signs are visible in the current MVP layer.",
+    supportingSigns:
+      signals.supportingSigns.length > 0
+        ? signals.supportingSigns
+        : [ruleConclusion || focusSummary || "The app needs more timing layers."],
+    warningSigns:
+      signals.warningSigns.length > 0
+        ? signals.warningSigns
+        : [
+            "No major warning signs are visible in the current MVP layer, but deeper WWG timing rules still need confirmation.",
+          ],
+    action:
+      "Track the real-world trigger points. Watch for appointments, approvals, messages, paperwork, deadlines, and movement around the moving-line or activation period.",
+    nextCheck: `Next check: compare moving lines, day/month strength, void-filling, transformed lines, and Shi/Ying. ${getMovingLineText(
+      movingLines
+    )}`,
+  };
+}
+
+function buildRelationshipRecommendation({
+  selectedFocus,
+  focusRows,
+  focusSummary,
+  ruleConclusion,
+  movingLines,
+  clarityScore,
+}) {
+  const signals = buildBaseSignals({
+    selectedFocus,
+    focusRows,
+    movingLines,
+    clarityScore,
+  });
+
+  const finalJudgment = getFinalJudgment({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  const confidence = getConfidence({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  let plainMeaning =
+    "The relationship or external-object matter is present, but the signal needs more confirmation before making a strong judgment.";
+
+  if (finalJudgment === "Static / Needs Activation") {
+    plainMeaning =
+      "The relationship or external-object matter is present, but the chart is static. This means the situation exists, but it may need communication, follow-through, or real-world confirmation before change appears.";
+  } else if (finalJudgment === "Strong Yes") {
+    plainMeaning =
+      "The chart gives a strong favorable signal for relationship or external-object development. The matter is visible, supported, and active.";
+  } else if (finalJudgment === "Cautious Yes" || finalJudgment === "Favorable") {
+    plainMeaning =
+      "The relationship or external-object matter is present and has a cautiously favorable signal, but stability is not guaranteed by itself.";
   }
 
-  return `Next check: compare the focus line against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic. ${movingText}`;
+  return {
+    result: finalJudgment,
+    finalJudgment,
+    confidence,
+    plainMeaning,
+    reason: plainMeaning,
+    risk:
+      signals.warningSigns.length > 0
+        ? `Warning signs: ${signals.warningSigns.join(" ")}`
+        : "Warning signs: No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
+    supportingSigns: signals.supportingSigns,
+    warningSigns:
+      signals.warningSigns.length > 0
+        ? signals.warningSigns
+        : [
+            "No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
+          ],
+    action:
+      "Move forward carefully. Keep communication steady, act consistently, and watch for practical confirmation that the situation is developing well.",
+    nextCheck: `Next check: compare the focus against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic. ${getMovingLineText(
+      movingLines
+    )}`,
+  };
+}
+
+function buildGenericRecommendation({
+  selectedFocus,
+  focusRows,
+  focusSummary,
+  ruleConclusion,
+  movingLines,
+  clarityScore,
+}) {
+  const signals = buildBaseSignals({
+    selectedFocus,
+    focusRows,
+    movingLines,
+    clarityScore,
+  });
+
+  const finalJudgment = getFinalJudgment({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  const confidence = getConfidence({
+    focusRows,
+    supported: signals.supported,
+    weakened: signals.weakened,
+    clashed: signals.clashed,
+    voided: signals.voided,
+    movingFocus: signals.movingFocus,
+    hasMovingLines: signals.hasMovingLines,
+    clarityScore,
+  });
+
+  const plainMeaning =
+    focusRows.length === 0
+      ? "The chart does not show the main selected useful-spirit factor clearly enough in this MVP layer. Treat the result as incomplete until deeper palace, hidden-spirit, and calendar rules are added."
+      : "The selected matter is present in the chart, but deeper WWG layers are still needed before making a fully reliable judgment.";
+
+  return {
+    result: finalJudgment,
+    finalJudgment,
+    confidence,
+    plainMeaning,
+    reason: plainMeaning,
+    risk:
+      signals.warningSigns.length > 0
+        ? `Warning signs: ${signals.warningSigns.join(" ")}`
+        : "Warning signs: No major warning signs are visible in the current MVP layer.",
+    supportingSigns:
+      signals.supportingSigns.length > 0
+        ? signals.supportingSigns
+        : [ruleConclusion || focusSummary || "The app needs more rule layers."],
+    warningSigns:
+      signals.warningSigns.length > 0
+        ? signals.warningSigns
+        : [
+            "No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
+          ],
+    action:
+      "Clarify the question, complete the calendar setup, and compare the matter line against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic.",
+    nextCheck: `Next check: compare the focus line against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic. ${getMovingLineText(
+      movingLines
+    )}`,
+  };
 }
 
 export function buildRecommendation({
   selectedMethod,
   selectedFocus,
-  focusRows,
-  focusSummary,
-  ruleConclusion,
-  conflictReport,
-  movingLines,
-  clarityScore,
+  focusRows = [],
+  focusSummary = "",
+  ruleConclusion = "",
+  conflictReport = {},
+  movingLines = [],
+  clarityScore = 0,
 }) {
-  const conditionText = getFocusConditionText(focusRows);
+  const normalizedFocus = String(selectedFocus || "").toLowerCase();
 
-  const { supportingSigns, warningSigns } = buildSignals({
-    selectedMethod,
+  if (normalizedFocus === "parent-line") {
+    return buildHousingRecommendation({
+      selectedFocus,
+      focusRows,
+      focusSummary,
+      ruleConclusion,
+      conflictReport,
+      movingLines,
+      clarityScore,
+    });
+  }
+
+  if (selectedMethod === "GLDM" || normalizedFocus === "asset-line") {
+    return buildMoneyRecommendation({
+      selectedFocus,
+      focusRows,
+      focusSummary,
+      ruleConclusion,
+      conflictReport,
+      movingLines,
+      clarityScore,
+    });
+  }
+
+  if (selectedMethod === "TDM" || normalizedFocus === "moving line") {
+    return buildTimingRecommendation({
+      selectedFocus,
+      focusRows,
+      focusSummary,
+      ruleConclusion,
+      conflictReport,
+      movingLines,
+      clarityScore,
+    });
+  }
+
+  if (selectedMethod === "RIDM" || normalizedFocus === "object-line") {
+    return buildRelationshipRecommendation({
+      selectedFocus,
+      focusRows,
+      focusSummary,
+      ruleConclusion,
+      conflictReport,
+      movingLines,
+      clarityScore,
+    });
+  }
+
+  return buildGenericRecommendation({
     selectedFocus,
     focusRows,
+    focusSummary,
+    ruleConclusion,
+    conflictReport,
     movingLines,
     clarityScore,
   });
-
-  const judgment = classifyJudgment({
-    focusRows,
-    conditionText,
-    movingLines,
-    supportingSigns,
-    warningSigns,
-    clarityScore,
-  });
-
-  const plainMeaning = buildPlainMeaning({
-    judgment,
-    selectedMethod,
-    selectedFocus,
-    focusRows,
-    conditionText,
-  });
-
-  const action = buildAction({
-    judgment,
-    selectedMethod,
-    selectedFocus,
-    conditionText,
-  });
-
-  const nextCheck = buildNextCheck({
-    selectedMethod,
-    selectedFocus,
-    movingLines,
-    conditionText,
-  });
-
-  const risk =
-    warningSigns.length > 0
-      ? warningSigns.join(" ")
-      : "No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.";
-
-  const reason =
-    supportingSigns.length > 0
-      ? supportingSigns.join(" ")
-      : ruleConclusion || focusSummary || "No strong supporting sign found yet.";
-
-  return {
-    finalJudgment: judgment.label,
-    confidence: judgment.confidence,
-    polarity: judgment.polarity,
-    plainMeaning,
-    supportingSigns,
-    warningSigns,
-
-    result: `Final Judgment: ${judgment.label}`,
-    reason: `Plain-English meaning: ${plainMeaning} Supporting signs: ${reason}`,
-    risk: `Warning signs: ${risk}`,
-    nextCheck,
-    action,
-
-    recommendedAction: action,
-    originalFocusSummary: focusSummary,
-    originalRuleConclusion: ruleConclusion,
-    originalConflictConfidence:
-      conflictReport?.confidence || judgment.confidence,
-  };
 }

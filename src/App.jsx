@@ -40,6 +40,7 @@ import { isFocusMatch, getFocusSummary } from "./logic/focusLogic";
 import { buildRuleGraph } from "./logic/ruleGraphLogic";
 import { buildConflictReport } from "./logic/conflictLogic";
 import { buildRecommendation } from "./logic/recommendationLogic";
+import { buildManualHexagramEntry } from "./logic/manualHexagramEntryLogic";
 import {
   buildSnapshotsExportJson,
   clearSavedSnapshots,
@@ -326,6 +327,10 @@ function App() {
   const [lineBranches, setLineBranches] = useState(defaultLineBranches);
   const [coinCastingHistory, setCoinCastingHistory] = useState([]);
 
+  const [manualHexagramNumber, setManualHexagramNumber] = useState("");
+  const [manualHexagramMovingLines, setManualHexagramMovingLines] = useState("");
+  const [manualHexagramStatus, setManualHexagramStatus] = useState("");
+
   const [castingDate, setCastingDate] = useState("");
   const [castingTime, setCastingTime] = useState("");
   const [location, setLocation] = useState("");
@@ -432,7 +437,17 @@ function App() {
   const method = methods.find((item) => item.id === selectedMethod);
 
   const recommendedFocus = methodFocusMap[selectedMethod];
-  const selectedFocus = manualFocus || recommendedFocus;
+
+  const refinementFocusHint = questionRefinement.focusHints?.[0];
+
+  const intentFocus =
+    refinementFocusHint &&
+    refinementFocusHint !== "Using recommended focus" &&
+    focusOptions.some((focus) => focus.key === refinementFocusHint)
+      ? refinementFocusHint
+      : "";
+
+  const selectedFocus = manualFocus || intentFocus || recommendedFocus;
 
   const selectedFocusInfo = focusOptions.find(
     (focus) => focus.key === selectedFocus
@@ -753,6 +768,7 @@ function App() {
     );
 
     setCoinCastingHistory([]);
+    setManualHexagramStatus("");
   }
 
   function updateLineBranch(index, value) {
@@ -794,6 +810,9 @@ function App() {
   function resetCurrentReading() {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
+    setManualHexagramNumber("");
+    setManualHexagramMovingLines("");
+    setManualHexagramStatus("");
 
     applyDefaultReadingState({
       setQuestion,
@@ -833,6 +852,9 @@ function App() {
   function loadPreset(preset) {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
+    setManualHexagramNumber("");
+    setManualHexagramMovingLines("");
+    setManualHexagramStatus("");
 
     applyPresetToAppState(preset, {
       setQuestion,
@@ -908,12 +930,34 @@ function App() {
 
     setLines(casting.lines);
     setCoinCastingHistory(casting.results);
+    setManualHexagramStatus("");
     setCopied(false);
     setSnapshotStatus(
       `Coin casting completed. Moving lines: ${
         casting.movingLines.length ? casting.movingLines.join(", ") : "none"
       }.`
     );
+    setDeleteConfirmArmed(false);
+    clearSnapshotEditModes();
+  }
+
+  function applyManualHexagramEntry() {
+    const result = buildManualHexagramEntry({
+      originalHexagramNumber: manualHexagramNumber,
+      movingLinesText: manualHexagramMovingLines,
+    });
+
+    if (!result.ok) {
+      setManualHexagramStatus(result.message);
+      setSnapshotStatus(result.message);
+      return;
+    }
+
+    setLines(result.lines);
+    setCoinCastingHistory([]);
+    setManualHexagramStatus(`${result.message}\n${result.lineSummary}`);
+    setSnapshotStatus("Manual hexagram entry applied.");
+    setCopied(false);
     setDeleteConfirmArmed(false);
     clearSnapshotEditModes();
   }
@@ -1030,6 +1074,9 @@ function App() {
     setEmotionalTone("");
     setSelectedQuestionIntent("");
     setCoinCastingHistory([]);
+    setManualHexagramNumber("");
+    setManualHexagramMovingLines("");
+    setManualHexagramStatus("");
 
     setQuestion(loadedQuestion);
     setSelectedMethod(snapshot.selectedMethod || "GLDM");
@@ -1800,19 +1847,83 @@ function App() {
       <section className="panel">
         <h2>6. Line Entry / Chart Builder</h2>
         <p className="section-note">
-          Cast six lines automatically with the three-coin method, or manually
-          enter six lines from bottom to top. Moving lines transform into the
-          second hexagram.
+          Cast six lines automatically with the three-coin method, manually
+          enter six lines from bottom to top, or enter a King Wen hexagram number
+          with moving lines.
         </p>
 
         <div className="recommendation-box">
           <strong>Casting mode:</strong>{" "}
-          {coinCastingHistory.length ? "Three-Coin Casting" : "Manual Line Entry"}
+          {coinCastingHistory.length
+            ? "Three-Coin Casting"
+            : manualHexagramStatus
+            ? "Manual Hexagram Entry"
+            : "Manual Line Entry"}
         </div>
 
         <button className="export-button" onClick={castReadingWithCoins}>
           Cast Reading with Three Coins
         </button>
+
+        <div className="focus-panel">
+          <h3>Manual Hexagram Entry</h3>
+          <p className="section-note">
+            Use this when you already cast a hexagram outside the app. Enter the
+            original King Wen number and any moving lines.
+          </p>
+
+          <div className="field-grid">
+            <label>
+              Original hexagram number
+              <input
+                value={manualHexagramNumber}
+                onChange={(event) => {
+                  setManualHexagramNumber(event.target.value);
+                  setManualHexagramStatus("");
+                  resetCopyAndStatus();
+                }}
+                placeholder="Example: 62"
+              />
+            </label>
+
+            <label>
+              Moving lines
+              <input
+                value={manualHexagramMovingLines}
+                onChange={(event) => {
+                  setManualHexagramMovingLines(event.target.value);
+                  setManualHexagramStatus("");
+                  resetCopyAndStatus();
+                }}
+                placeholder="Example: 2, 5"
+              />
+            </label>
+
+            <label>
+              Apply manual chart
+              <button onClick={applyManualHexagramEntry}>
+                Apply Manual Hexagram
+              </button>
+            </label>
+          </div>
+
+          {manualHexagramStatus && (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                textAlign: "left",
+                color: "#f4e5d0",
+                background: "rgba(15, 15, 18, 0.35)",
+                border: "1px solid rgba(207, 224, 255, 0.18)",
+                borderRadius: "18px",
+                padding: "16px",
+                lineHeight: 1.45,
+              }}
+            >
+              {manualHexagramStatus}
+            </pre>
+          )}
+        </div>
 
         {coinCastingHistory.length > 0 && (
           <div className="rule-list">
@@ -1943,7 +2054,7 @@ function App() {
           <div className="field-grid">
             <label>
               Recommended focus
-              <input value={`${recommendedFocus} from ${selectedMethod}`} readOnly />
+              <input value={`${selectedFocus} from ${selectedMethod}`} readOnly />
             </label>
 
             <label>
@@ -2201,11 +2312,11 @@ function App() {
             </p>
           </div>
           <div className="recommendation-card">
-            <strong>Shi / Self Placeholder</strong>
+            <strong>Shi / Self Line</strong>
             <p>Line {palaceRules.shiLine}</p>
           </div>
           <div className="recommendation-card">
-            <strong>Ying / Other Placeholder</strong>
+            <strong>Ying / Other Line</strong>
             <p>Line {palaceRules.yingLine}</p>
           </div>
         </div>

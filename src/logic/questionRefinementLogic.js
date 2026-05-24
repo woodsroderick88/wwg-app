@@ -1,6 +1,37 @@
 const INTENT_OPTIONS = [
   { id: "", label: "Auto-detect intent" },
   {
+    id: "housing",
+    label: "Home / Housing / Shelter",
+    methodHint: "ADM",
+    focusHint: "Parent-line",
+    keywords: [
+      "housing",
+      "apartment",
+      "government apartment",
+      "government housing",
+      "public housing",
+      "section 8",
+      "voucher",
+      "shelter",
+      "home",
+      "house",
+      "lease",
+      "rental",
+      "rent",
+      "landlord",
+      "tenant",
+      "application",
+      "apply for housing",
+      "housing application",
+      "approved for housing",
+      "secure housing",
+      "secure a government apartment",
+      "full apartment",
+      "northside",
+    ],
+  },
+  {
     id: "money",
     label: "Money / Profit / Business",
     methodHint: "GLDM",
@@ -122,20 +153,26 @@ const INTENT_OPTIONS = [
   {
     id: "home",
     label: "Home / Property / Document",
-    methodHint: "RIDM",
-    focusHint: "Parent",
+    methodHint: "ADM",
+    focusHint: "Parent-line",
     keywords: [
-      "home",
-      "house",
       "property",
-      "apartment",
-      "lease",
       "contract",
       "document",
       "paper",
       "vehicle",
       "car",
       "land",
+      "housing",
+      "apartment",
+      "government housing",
+      "government apartment",
+      "public housing",
+      "lease",
+      "rental",
+      "home",
+      "house",
+      "shelter",
     ],
   },
   {
@@ -329,6 +366,7 @@ function normalizeTimeframe(timeframe) {
     "the next three months": "the next three months",
     "next 3 months": "the next three months",
     "the next 3 months": "the next three months",
+    "in the next three months": "the next three months",
 
     "twelve months": "the next twelve months",
     "12 months": "the next twelve months",
@@ -378,9 +416,7 @@ function extractTimeframeFromQuestion(rawQuestion) {
     /\b\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
   ];
 
-  const match = patterns
-    .map((pattern) => raw.match(pattern))
-    .find(Boolean);
+  const match = patterns.map((pattern) => raw.match(pattern)).find(Boolean);
 
   if (!match?.[0]) return "";
 
@@ -711,8 +747,68 @@ function buildLegalDischargeQuestion(rawQuestion, selfRole, objectRole, timefram
   );
 }
 
+function inferHousingSubject(rawQuestion, objectRole) {
+  const raw = lower(rawQuestion);
+  const object = lower(objectRole);
+
+  if (
+    raw.includes("government apartment") ||
+    object.includes("government apartment") ||
+    raw.includes("full apartment") ||
+    object.includes("full apartment")
+  ) {
+    return "government housing";
+  }
+
+  if (raw.includes("government housing") || object.includes("government housing")) {
+    return "government housing";
+  }
+
+  if (raw.includes("public housing") || object.includes("public housing")) {
+    return "public housing";
+  }
+
+  if (raw.includes("section 8") || object.includes("section 8")) {
+    return "Section 8 housing";
+  }
+
+  if (raw.includes("apartment") || object.includes("apartment")) {
+    return "housing";
+  }
+
+  if (raw.includes("shelter") || object.includes("shelter")) {
+    return "shelter";
+  }
+
+  return clean(objectRole) || "housing";
+}
+
+function buildHousingQuestion(rawQuestion, objectRole, timeframe) {
+  const time = normalizeTimeframe(timeframe) || extractTimeframeFromQuestion(rawQuestion);
+  const housingSubject = inferHousingSubject(rawQuestion, objectRole);
+
+  const raw = lower(rawQuestion);
+  const approvalLanguage =
+    raw.includes("approved") ||
+    raw.includes("application") ||
+    raw.includes("apply") ||
+    raw.includes("government") ||
+    raw.includes("public housing") ||
+    raw.includes("section 8");
+
+  const baseQuestion = approvalLanguage
+    ? `Will I be approved for ${housingSubject}`
+    : `Will I secure ${housingSubject}`;
+
+  return addQuestionMark(time ? `${baseQuestion} within ${time}` : baseQuestion);
+}
+
 function inferOutcomePhrase(rawQuestion, clarifiedIntent, detectedIntentId) {
   const combined = lower(`${rawQuestion} ${clarifiedIntent}`);
+
+  if (detectedIntentId === "housing" || detectedIntentId === "home") {
+    return "be secured";
+  }
 
   if (
     detectedIntentId === "money" ||
@@ -895,6 +991,10 @@ export function buildFinalCastingQuestionSuggestion({
   const detectedIntent = detectQuestionIntent([raw, intent, object].join(" "));
   const cleanBase = removeDuplicateTimeframeFromQuestion(raw, time);
 
+  if (detectedIntent.id === "housing" || detectedIntent.id === "home") {
+    return buildHousingQuestion(raw, object, time);
+  }
+
   if (detectedIntent.id === "money") {
     const subject = inferCleanSubject(raw, object);
     const cleanSubject =
@@ -1019,13 +1119,20 @@ export function analyzeQuestionRefinement({
 
   const inferredSelf =
     preliminaryIntent.id === "discharge" ? inferDischargePerson(raw, selfRole) : "";
+
   const inferredObject =
-    preliminaryIntent.id === "discharge" ? inferInstitution(raw, objectRole) : "";
+    preliminaryIntent.id === "discharge"
+      ? inferInstitution(raw, objectRole)
+      : preliminaryIntent.id === "housing" || preliminaryIntent.id === "home"
+      ? inferHousingSubject(raw, objectRole)
+      : "";
 
   const self = clean(selfRole) || (inferredSelf !== "the person" ? inferredSelf : "");
+
   const object =
     clean(objectRole) ||
     (inferredObject !== "the institution" ? inferredObject : "");
+
   const time = normalizeTimeframe(timeframe) || inferredTimeframe;
 
   const explicitFinalQuestion = clean(finalCastingQuestion);
