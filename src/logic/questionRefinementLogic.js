@@ -66,6 +66,12 @@ const INTENT_OPTIONS = [
       "friend",
       "love",
       "family",
+      "therese",
+      "dating",
+      "stability",
+      "stable",
+      "develop",
+      "positively",
     ],
   },
   {
@@ -234,13 +240,16 @@ const ASSUMPTION_PHRASES = [
 
 const TIMEFRAME_PATTERNS = [
   /\b\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
-  /\bnext\s+(day|week|month|year|few days|few weeks|few months)\b/i,
+  /\bnext\s+(day|week|month|year|few days|few weeks|few months|twelve months|12 months|three years|3 years)\b/i,
+  /\bover\s+(the\s+)?next\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+  /\bover\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months|twelve months|12 months|three years|3 years)\b/i,
   /\bwithin\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
   /\bwithin\s+(the\s+)?next\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
-  /\bwithin\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months)\b/i,
+  /\bwithin\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months|twelve months|12 months|three years|3 years)\b/i,
   /\bby\s+(tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|january|february|march|april|may|june|july|august|september|october|november|december|the end|end of)\b/i,
   /\bthis\s+(week|month|year|quarter)\b/i,
   /\bin\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+  /\bin\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months|twelve months|12 months|three years|3 years)\b/i,
 ];
 
 function clean(value) {
@@ -269,8 +278,22 @@ function stripTrailingQuestionMarks(text) {
   return clean(text).replace(/\?+$/g, "").trim();
 }
 
+function normalizeSpaces(text) {
+  return clean(text).replace(/\s+/g, " ");
+}
+
+function addQuestionMark(text) {
+  const value = stripTrailingQuestionMarks(text);
+  return value ? `${value}?` : "";
+}
+
 function normalizeTimeframe(timeframe) {
-  const value = lower(timeframe);
+  const value = lower(timeframe)
+    .replace(/\s+/g, " ")
+    .replace(/^within\s+/i, "")
+    .replace(/^over\s+/i, "")
+    .replace(/^in\s+/i, "")
+    .trim();
 
   if (!value) {
     return "";
@@ -280,49 +303,199 @@ function normalizeTimeframe(timeframe) {
     "three months": "the next three months",
     "3 months": "the next three months",
     "next three months": "the next three months",
+    "the next three months": "the next three months",
     "next 3 months": "the next three months",
-    "within next three months": "the next three months",
-    "within the next three months": "the next three months",
-    "within next 3 months": "the next three months",
-    "within the next 3 months": "the next three months",
+    "the next 3 months": "the next three months",
+
+    "twelve months": "the next twelve months",
+    "12 months": "the next twelve months",
+    "next twelve months": "the next twelve months",
+    "the next twelve months": "the next twelve months",
+    "next 12 months": "the next twelve months",
+    "the next 12 months": "the next twelve months",
+
     "one month": "the next month",
     "1 month": "the next month",
     "next month": "the next month",
+    "the next month": "the next month",
+
     "next week": "the next week",
+    "the next week": "the next week",
     "one week": "the next week",
     "1 week": "the next week",
+
     "next year": "the next year",
+    "the next year": "the next year",
     "one year": "the next year",
     "1 year": "the next year",
+
+    "three years": "the next three years",
+    "3 years": "the next three years",
+    "next three years": "the next three years",
+    "the next three years": "the next three years",
+    "next 3 years": "the next three years",
+    "the next 3 years": "the next three years",
   };
 
-  return cleanupMap[value] || clean(timeframe);
+  return cleanupMap[value] || value;
 }
 
-function removeDuplicateTimeframeFromQuestion(question, timeframe) {
-  let result = stripTrailingQuestionMarks(question);
-  const normalized = normalizeTimeframe(timeframe);
+function timeframeToRegexText(timeframe) {
+  return normalizeTimeframe(timeframe)
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\s+/g, "\\s+");
+}
 
-  if (!result || !normalized) {
-    return result;
+function removeDuplicateTimeframeFromQuestion(question, timeframe = "") {
+  let result = stripTrailingQuestionMarks(question);
+
+  const normalizedTimeframe = normalizeTimeframe(timeframe);
+  const timeframePatternText = timeframeToRegexText(normalizedTimeframe);
+
+  if (timeframePatternText) {
+    const exactDuplicatePatterns = [
+      new RegExp(`\\s+within\\s+${timeframePatternText}$`, "i"),
+      new RegExp(`\\s+over\\s+${timeframePatternText}$`, "i"),
+      new RegExp(`\\s+in\\s+${timeframePatternText}$`, "i"),
+      new RegExp(`\\s+${timeframePatternText}$`, "i"),
+    ];
+
+    exactDuplicatePatterns.forEach((pattern) => {
+      result = result.replace(pattern, "").trim();
+    });
   }
 
   const duplicatePatterns = [
-    /\s+within\s+next\s+three\s+months$/i,
+    /\s+within\s+over\s+the\s+next\s+[a-z0-9\s]+$/i,
     /\s+within\s+the\s+next\s+three\s+months$/i,
+    /\s+within\s+next\s+three\s+months$/i,
+    /\s+within\s+the\s+next\s+twelve\s+months$/i,
+    /\s+within\s+next\s+twelve\s+months$/i,
+    /\s+within\s+the\s+next\s+three\s+years$/i,
+    /\s+within\s+next\s+three\s+years$/i,
+    /\s+over\s+the\s+next\s+twelve\s+months$/i,
+    /\s+over\s+next\s+twelve\s+months$/i,
+    /\s+over\s+the\s+next\s+three\s+years$/i,
+    /\s+over\s+next\s+three\s+years$/i,
+    /\s+in\s+the\s+next\s+twelve\s+months$/i,
+    /\s+in\s+next\s+twelve\s+months$/i,
+    /\s+in\s+the\s+next\s+three\s+years$/i,
+    /\s+in\s+next\s+three\s+years$/i,
     /\s+in\s+three\s+months$/i,
-    /\s+within\s+3\s+months$/i,
-    /\s+within\s+the\s+next\s+3\s+months$/i,
-    /\s+within\s+next\s+3\s+months$/i,
+    /\s+in\s+twelve\s+months$/i,
+    /\s+in\s+three\s+years$/i,
     /\s+next\s+three\s+months$/i,
-    /\s+next\s+3\s+months$/i,
+    /\s+next\s+twelve\s+months$/i,
+    /\s+next\s+three\s+years$/i,
   ];
 
   duplicatePatterns.forEach((pattern) => {
     result = result.replace(pattern, "").trim();
   });
 
-  return result;
+  return normalizeSpaces(result);
+}
+
+function questionAlreadyEndsWithTimeframe(question, timeframe) {
+  const value = lower(stripTrailingQuestionMarks(question));
+  const normalizedTimeframe = lower(normalizeTimeframe(timeframe));
+
+  if (!value || !normalizedTimeframe) {
+    return false;
+  }
+
+  return (
+    value.endsWith(`within ${normalizedTimeframe}`) ||
+    value.endsWith(`over ${normalizedTimeframe}`) ||
+    value.endsWith(`in ${normalizedTimeframe}`) ||
+    value.endsWith(normalizedTimeframe)
+  );
+}
+
+function relationshipOutcomeAlreadyPresent(question) {
+  const value = lower(question);
+
+  return (
+    value.includes("remain stable and develop positively") ||
+    value.includes("remain stable") ||
+    value.includes("develop positively") ||
+    value.includes("stable and develop")
+  );
+}
+
+function removeRelationshipOutcomeFromBase(question) {
+  return normalizeSpaces(
+    stripTrailingQuestionMarks(question)
+      .replace(/\s+remain\s+stable\s+and\s+develop\s+positively\b/gi, "")
+      .replace(/\s+remain\s+stable\b/gi, "")
+      .replace(/\s+develop\s+positively\b/gi, "")
+  );
+}
+
+function cleanRelationshipQuestion(question, timeframe) {
+  let result = normalizeSpaces(stripTrailingQuestionMarks(question));
+
+  result = result.replace(
+    /\bremain\s+stable\s+and\s+develop\s+positively\s+remain\s+stable\s+and\s+develop\s+positively\b/gi,
+    "remain stable and develop positively"
+  );
+
+  result = result.replace(
+    /\bremain\s+stable\s+remain\s+stable\b/gi,
+    "remain stable"
+  );
+
+  result = result.replace(
+    /\bdevelop\s+positively\s+develop\s+positively\b/gi,
+    "develop positively"
+  );
+
+  const normalizedTimeframe = normalizeTimeframe(timeframe);
+
+  if (normalizedTimeframe) {
+    const escapedTimeframe = timeframeToRegexText(normalizedTimeframe);
+
+    result = result.replace(
+      new RegExp(
+        `(within|over|in)\\s+${escapedTimeframe}\\s+(within|over|in)\\s+${escapedTimeframe}$`,
+        "i"
+      ),
+      `over ${normalizedTimeframe}`
+    );
+
+    result = result.replace(
+      new RegExp(
+        `(within|over|in)\\s+${escapedTimeframe}\\s+${escapedTimeframe}$`,
+        "i"
+      ),
+      `over ${normalizedTimeframe}`
+    );
+  }
+
+  return addQuestionMark(result);
+}
+
+function inferRelationshipSubject(rawQuestion, objectRole) {
+  const raw = clean(rawQuestion);
+  const object = clean(objectRole);
+
+  const relationshipMatch = raw.match(
+    /relationship\s+with\s+([^?]+?)(?:\s+in\s+|\s+over\s+|\s+within\s+|$)/i
+  );
+
+  if (relationshipMatch?.[1]) {
+    return `my relationship with ${relationshipMatch[1].trim()}`;
+  }
+
+  if (object.toLowerCase().includes("therese")) {
+    return "my relationship with Therese";
+  }
+
+  if (object.toLowerCase().includes("relationship")) {
+    return "my relationship";
+  }
+
+  return object || "the relationship";
 }
 
 function inferCleanSubject(rawQuestion, objectRole) {
@@ -366,7 +539,7 @@ function inferOutcomePhrase(rawQuestion, clarifiedIntent, detectedIntentId) {
   }
 
   if (detectedIntentId === "relationship") {
-    return "develop favorably";
+    return "remain stable and develop positively";
   }
 
   if (detectedIntentId === "health") {
@@ -466,7 +639,9 @@ export function getQuestionIntentOptions() {
 
 export function detectQuestionIntent(question, selectedIntent = "") {
   if (selectedIntent) {
-    const selected = INTENT_OPTIONS.find((option) => option.id === selectedIntent);
+    const selected = INTENT_OPTIONS.find(
+      (option) => option.id === selectedIntent
+    );
 
     if (selected) {
       return {
@@ -484,7 +659,9 @@ export function detectQuestionIntent(question, selectedIntent = "") {
 
   const scored = INTENT_OPTIONS.filter((option) => option.id && option.keywords)
     .map((option) => {
-      const matches = option.keywords.filter((keyword) => text.includes(keyword));
+      const matches = option.keywords.filter((keyword) =>
+        text.includes(keyword)
+      );
 
       return {
         ...option,
@@ -544,26 +721,63 @@ export function buildFinalCastingQuestionSuggestion({
     const cleanSubject =
       subject.toLowerCase() === "wwg app" ? "the WWG app" : subject;
 
-    if (time) {
+    if (time && !questionAlreadyEndsWithTimeframe(raw, time)) {
       return `Will ${cleanSubject} generate profit within ${time}?`;
+    }
+
+    if (time && questionAlreadyEndsWithTimeframe(raw, time)) {
+      return addQuestionMark(cleanBase || raw);
     }
 
     return `Will ${cleanSubject} generate profit?`;
   }
+
+  if (detectedIntent.id === "relationship") {
+    const normalizedRaw = cleanRelationshipQuestion(raw, time);
+
+    if (
+      raw &&
+      relationshipOutcomeAlreadyPresent(raw) &&
+      questionAlreadyEndsWithTimeframe(raw, time)
+    ) {
+      return normalizedRaw;
+    }
+
+    const relationshipSubject = inferRelationshipSubject(
+      removeRelationshipOutcomeFromBase(raw),
+      object
+    );
+
+    const baseRelationshipQuestion = `Will ${relationshipSubject} remain stable and develop positively`;
+
+    if (time) {
+      return cleanRelationshipQuestion(`${baseRelationshipQuestion} over ${time}`, time);
+    }
+
+    return cleanRelationshipQuestion(baseRelationshipQuestion, time);
+  }
+
+  const outcomePhrase = inferOutcomePhrase(raw, intent, detectedIntent.id);
 
   if (cleanBase && time && !hasTimeframe(raw)) {
     return `${cleanBase} within ${time}?`;
   }
 
   if (cleanBase && time && hasTimeframe(raw)) {
-    return `${cleanBase} within ${time}?`;
+    if (questionAlreadyEndsWithTimeframe(raw, time)) {
+      return addQuestionMark(raw);
+    }
+
+    if (cleanBase.toLowerCase().startsWith("will ")) {
+      return `${cleanBase} within ${time}?`;
+    }
+
+    return `Will ${object || "the matter"} ${outcomePhrase} within ${time}?`;
   }
 
   if (raw) {
     return raw.endsWith("?") ? raw : `${raw}?`;
   }
-
-  const outcomePhrase = inferOutcomePhrase(raw, intent, detectedIntent.id);
 
   if (intent && object && time) {
     return `Will ${object} ${outcomePhrase} for ${self || "me"} within ${time}?`;
@@ -596,6 +810,7 @@ export function analyzeQuestionRefinement({
   const self = clean(selfRole);
   const object = clean(objectRole);
   const time = normalizeTimeframe(timeframe);
+  const explicitFinalQuestion = clean(finalCastingQuestion);
 
   const suggestedFinalQuestion = buildFinalCastingQuestionSuggestion({
     rawQuestion: raw,
@@ -605,14 +820,15 @@ export function analyzeQuestionRefinement({
     timeframe: time,
   });
 
-  const finalQuestion = clean(finalCastingQuestion || suggestedFinalQuestion);
+  const analysisQuestion = explicitFinalQuestion || suggestedFinalQuestion;
+  const finalQuestion = explicitFinalQuestion;
 
   const detectedIntent = detectQuestionIntent(
-    [finalQuestion, raw, intentText].join(" "),
+    [analysisQuestion, raw, intentText].join(" "),
     selectedIntent
   );
 
-  const questionForm = detectQuestionForm(finalQuestion || raw);
+  const questionForm = detectQuestionForm(analysisQuestion || raw);
 
   const warnings = [];
   const strengths = [];
@@ -622,6 +838,15 @@ export function analyzeQuestionRefinement({
     warnings.push("Enter a raw question before refining the reading.");
   } else {
     strengths.push("Raw question entered.");
+  }
+
+  if (!explicitFinalQuestion) {
+    warnings.push(
+      "Click “Use Suggested Final Question” or manually enter a Final Casting Question before casting."
+    );
+    qualityFlags.push("missing-final-casting-question");
+  } else {
+    strengths.push("Final casting question is applied.");
   }
 
   if (!questionForm.isQuestionLike) {
@@ -652,7 +877,7 @@ export function analyzeQuestionRefinement({
     strengths.push("Object is defined.");
   }
 
-  if (!time && !hasTimeframe(finalQuestion)) {
+  if (!time && !hasTimeframe(analysisQuestion)) {
     warnings.push("Add a timeframe so the reading has a clear boundary.");
     qualityFlags.push("missing-timeframe");
   } else {
@@ -666,7 +891,7 @@ export function analyzeQuestionRefinement({
     strengths.push("Known facts are recorded.");
   }
 
-  const assumptionScanText = [raw, assumptionText, finalQuestion].join(" ");
+  const assumptionScanText = [raw, assumptionText, analysisQuestion].join(" ");
 
   if (hasAny(assumptionScanText, ASSUMPTION_PHRASES)) {
     warnings.push(
@@ -679,7 +904,7 @@ export function analyzeQuestionRefinement({
     strengths.push("Assumptions have been named.");
   }
 
-  const emotionScanText = [raw, emotion, finalQuestion].join(" ");
+  const emotionScanText = [raw, emotion, analysisQuestion].join(" ");
 
   if (hasAny(emotionScanText, EMOTION_WORDS)) {
     warnings.push(
@@ -692,18 +917,23 @@ export function analyzeQuestionRefinement({
     strengths.push("Emotional tone has been acknowledged.");
   }
 
-  if (finalQuestion.length > 180) {
+  if (analysisQuestion.length > 180) {
     warnings.push("The final casting question is long. Shorten it if possible.");
     qualityFlags.push("long-final-question");
   }
 
-  if (finalQuestion && finalQuestion.length < 15) {
+  if (analysisQuestion && analysisQuestion.length < 15) {
     warnings.push("The final casting question may be too short or vague.");
     qualityFlags.push("short-final-question");
   }
 
   const scoringItems = [
-    { key: "raw-question", points: 15, passed: Boolean(raw) },
+    { key: "raw-question", points: 10, passed: Boolean(raw) },
+    {
+      key: "final-question-applied",
+      points: 15,
+      passed: Boolean(explicitFinalQuestion),
+    },
     { key: "question-form", points: 10, passed: questionForm.isQuestionLike },
     {
       key: "clear-intent",
@@ -715,7 +945,7 @@ export function analyzeQuestionRefinement({
     {
       key: "timeframe-defined",
       points: 15,
-      passed: Boolean(time || hasTimeframe(finalQuestion)),
+      passed: Boolean(time || hasTimeframe(analysisQuestion)),
     },
     { key: "grounded-facts", points: 10, passed: Boolean(facts) },
     {
@@ -727,15 +957,20 @@ export function analyzeQuestionRefinement({
     },
   ];
 
-  const clarityScore = scoringItems.reduce(
-    (total, item) => total + (item.passed ? item.points : 0),
-    0
+  const clarityScore = Math.min(
+    100,
+    scoringItems.reduce(
+      (total, item) => total + (item.passed ? item.points : 0),
+      0
+    )
   );
 
   let readinessLabel = "Too vague for reliable coding";
 
   if (clarityScore >= 85) {
-    readinessLabel = "Ready to cast";
+    readinessLabel = explicitFinalQuestion
+      ? "Ready to cast"
+      : "Ready after final question is applied";
   } else if (clarityScore >= 70) {
     readinessLabel = "Usable but could be sharper";
   } else if (clarityScore >= 50) {
@@ -747,10 +982,10 @@ export function analyzeQuestionRefinement({
 
   const readyToCast =
     clarityScore >= 70 &&
-    Boolean(finalQuestion) &&
+    Boolean(explicitFinalQuestion) &&
     Boolean(self) &&
     Boolean(object) &&
-    Boolean(time || hasTimeframe(finalQuestion));
+    Boolean(time || hasTimeframe(analysisQuestion));
 
   return {
     rawQuestion: raw,
