@@ -1,8 +1,5 @@
 const INTENT_OPTIONS = [
-  {
-    id: "",
-    label: "Auto-detect intent",
-  },
+  { id: "", label: "Auto-detect intent" },
   {
     id: "money",
     label: "Money / Profit / Business",
@@ -14,14 +11,11 @@ const INTENT_OPTIONS = [
       "income",
       "revenue",
       "sales",
-      "sale",
       "business",
       "wealth",
       "financial",
       "paid",
-      "paying",
       "earn",
-      "earning",
       "app",
       "product",
       "launch",
@@ -47,6 +41,10 @@ const INTENT_OPTIONS = [
       "placement",
       "custody",
       "detention",
+      "court",
+      "courts",
+      "judge",
+      "legal",
       "released",
       "release",
       "discharged",
@@ -287,6 +285,10 @@ function lower(value) {
   return clean(value).toLowerCase();
 }
 
+function normalizeSpaces(text) {
+  return clean(text).replace(/\s+/g, " ");
+}
+
 function hasAny(text, words) {
   const value = lower(text);
   return words.some((word) => value.includes(word));
@@ -305,10 +307,6 @@ function stripTrailingQuestionMarks(text) {
   return clean(text).replace(/\?+$/g, "").trim();
 }
 
-function normalizeSpaces(text) {
-  return clean(text).replace(/\s+/g, " ");
-}
-
 function addQuestionMark(text) {
   const value = stripTrailingQuestionMarks(text);
   return value ? `${value}?` : "";
@@ -322,9 +320,7 @@ function normalizeTimeframe(timeframe) {
     .replace(/^in\s+/i, "")
     .trim();
 
-  if (!value) {
-    return "";
-  }
+  if (!value) return "";
 
   const cleanupMap = {
     "three months": "the next three months",
@@ -367,6 +363,30 @@ function normalizeTimeframe(timeframe) {
   return cleanupMap[value] || value;
 }
 
+function extractTimeframeFromQuestion(rawQuestion) {
+  const raw = clean(rawQuestion);
+
+  const patterns = [
+    /\bwithin\s+(the\s+)?next\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+    /\bwithin\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months|three months|twelve months|three years)\b/i,
+    /\bin\s+(the\s+)?next\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+    /\bin\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months|three months|twelve months|three years)\b/i,
+    /\bover\s+(the\s+)?next\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+    /\bover\s+(the\s+)?next\s+(day|week|month|year|few days|few weeks|few months|three months|twelve months|three years)\b/i,
+    /\bnext\s+\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+    /\bnext\s+(day|week|month|year|few days|few weeks|few months|three months|twelve months|three years)\b/i,
+    /\b\d+\s*(day|days|week|weeks|month|months|year|years)\b/i,
+  ];
+
+  const match = patterns
+    .map((pattern) => raw.match(pattern))
+    .find(Boolean);
+
+  if (!match?.[0]) return "";
+
+  return normalizeTimeframe(match[0]);
+}
+
 function timeframeToRegexText(timeframe) {
   return normalizeTimeframe(timeframe)
     .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
@@ -375,24 +395,21 @@ function timeframeToRegexText(timeframe) {
 
 function removeDuplicateTimeframeFromQuestion(question, timeframe = "") {
   let result = stripTrailingQuestionMarks(question);
-
   const normalizedTimeframe = normalizeTimeframe(timeframe);
   const timeframePatternText = timeframeToRegexText(normalizedTimeframe);
 
   if (timeframePatternText) {
-    const exactDuplicatePatterns = [
+    [
       new RegExp(`\\s+within\\s+${timeframePatternText}$`, "i"),
       new RegExp(`\\s+over\\s+${timeframePatternText}$`, "i"),
       new RegExp(`\\s+in\\s+${timeframePatternText}$`, "i"),
       new RegExp(`\\s+${timeframePatternText}$`, "i"),
-    ];
-
-    exactDuplicatePatterns.forEach((pattern) => {
+    ].forEach((pattern) => {
       result = result.replace(pattern, "").trim();
     });
   }
 
-  const duplicatePatterns = [
+  [
     /\s+within\s+over\s+the\s+next\s+[a-z0-9\s]+$/i,
     /\s+within\s+the\s+next\s+three\s+months$/i,
     /\s+within\s+next\s+three\s+months$/i,
@@ -414,9 +431,7 @@ function removeDuplicateTimeframeFromQuestion(question, timeframe = "") {
     /\s+next\s+three\s+months$/i,
     /\s+next\s+twelve\s+months$/i,
     /\s+next\s+three\s+years$/i,
-  ];
-
-  duplicatePatterns.forEach((pattern) => {
+  ].forEach((pattern) => {
     result = result.replace(pattern, "").trim();
   });
 
@@ -427,9 +442,7 @@ function questionAlreadyEndsWithTimeframe(question, timeframe) {
   const value = lower(stripTrailingQuestionMarks(question));
   const normalizedTimeframe = lower(normalizeTimeframe(timeframe));
 
-  if (!value || !normalizedTimeframe) {
-    return false;
-  }
+  if (!value || !normalizedTimeframe) return false;
 
   return (
     value.endsWith(`within ${normalizedTimeframe}`) ||
@@ -525,29 +538,88 @@ function inferRelationshipSubject(rawQuestion, objectRole) {
   return object || "the relationship";
 }
 
+function inferCleanSubject(rawQuestion, objectRole) {
+  const raw = lower(rawQuestion);
+  const object = clean(objectRole);
+
+  if (object) return object;
+  if (raw.includes("this app")) return "this app";
+  if (raw.includes("wwg app")) return "the WWG app";
+  if (raw.includes("app")) return "the app";
+
+  return "the matter";
+}
+
+function isLegalDischargeQuestion(rawQuestion) {
+  const value = lower(rawQuestion);
+  return (
+    value.includes("court") ||
+    value.includes("courts") ||
+    value.includes("judge") ||
+    value.includes("legal")
+  );
+}
+
 function inferDischargePerson(rawQuestion, selfRole) {
   const raw = clean(rawQuestion);
   const self = clean(selfRole);
 
-  if (self) {
-    return self;
+  if (self) return self;
+
+  const legalReleaseMatch = raw.match(
+    /\b(?:court|courts|judge|legal authority|legal system)\s+(?:will\s+)?release\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*)*)\s+from\b/i
+  );
+
+  if (legalReleaseMatch?.[1]) {
+    return legalReleaseMatch[1].trim();
   }
 
-  const willMatch = raw.match(/^will\s+(.+?)\s+(get out|leave|be discharged|be released|come home|return home|move out)/i);
+  const releaseMatch = raw.match(
+    /\brelease\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*)*)\s+from\b/i
+  );
 
-  if (willMatch?.[1]) {
-    return willMatch[1].trim();
+  if (releaseMatch?.[1]) {
+    return releaseMatch[1].trim();
+  }
+
+  const dischargedMatch = raw.match(
+    /\bwill\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*)*)\s+be\s+(?:discharged|released)\b/i
+  );
+
+  if (dischargedMatch?.[1]) {
+    return dischargedMatch[1].trim();
+  }
+
+  const getOutMatch = raw.match(
+    /\bwill\s+([A-Z][a-zA-Z'-]*(?:\s+[A-Z][a-zA-Z'-]*)*)\s+(?:get out|leave|come home|return home|move out)\b/i
+  );
+
+  if (getOutMatch?.[1]) {
+    return getOutMatch[1].trim();
+  }
+
+  const namedPersonMatch = raw.match(/\b(Therese)\b/i);
+  if (namedPersonMatch?.[1]) {
+    return namedPersonMatch[1];
   }
 
   return "the person";
 }
 
 function inferInstitution(rawQuestion, objectRole) {
+  const rawOriginal = clean(rawQuestion);
   const raw = lower(rawQuestion);
   const object = clean(objectRole);
 
-  if (object) {
-    return object;
+  const fromMatch = rawOriginal.match(
+    /from\s+(the\s+)?([^?]+?)(?:\s+in\s+|\s+within\s+|\s+over\s+|\s+by\s+|$)/i
+  );
+
+  if (fromMatch?.[2]) {
+    const place = fromMatch[2].trim();
+    if (place && !/court|judge|legal|release/i.test(place)) {
+      return `${fromMatch[1] || ""}${place}`.trim();
+    }
   }
 
   const institutionPatterns = [
@@ -566,7 +638,24 @@ function inferInstitution(rawQuestion, objectRole) {
   const found = institutionPatterns.find((item) => raw.includes(item));
 
   if (found) {
+    if (
+      found === "nursing home" ||
+      found === "hospital" ||
+      found === "facility" ||
+      found === "institution" ||
+      found === "rehab"
+    ) {
+      return `the ${found}`;
+    }
+
     return found;
+  }
+
+  if (object) {
+    const cleanedObject = object.split("/")[0].trim();
+    if (cleanedObject && !/court|judge|legal|release/i.test(cleanedObject)) {
+      return cleanedObject;
+    }
   }
 
   return "the institution";
@@ -575,6 +664,16 @@ function inferInstitution(rawQuestion, objectRole) {
 function cleanDischargeQuestion(question, timeframe) {
   let result = normalizeSpaces(stripTrailingQuestionMarks(question));
   const normalizedTimeframe = normalizeTimeframe(timeframe);
+
+  result = result
+    .replace(/\s+\/\s+court\s+release/gi, "")
+    .replace(/\s+\/\s+legal\s+release/gi, "")
+    .replace(/\s+\/\s+release/gi, "")
+    .replace(/\s+from\s+Courts\b/g, " by the courts")
+    .replace(/\s+from\s+Court\b/g, " by the court")
+    .replace(/\bfrom\s+nursing home\b/gi, "from the nursing home")
+    .replace(/\bfrom\s+hospital\b/gi, "from the hospital")
+    .replace(/\bfrom\s+facility\b/gi, "from the facility");
 
   if (normalizedTimeframe) {
     const escapedTimeframe = timeframeToRegexText(normalizedTimeframe);
@@ -599,27 +698,17 @@ function cleanDischargeQuestion(question, timeframe) {
   return addQuestionMark(result);
 }
 
-function inferCleanSubject(rawQuestion, objectRole) {
-  const raw = lower(rawQuestion);
-  const object = clean(objectRole);
+function buildLegalDischargeQuestion(rawQuestion, selfRole, objectRole, timeframe) {
+  const person = inferDischargePerson(rawQuestion, selfRole);
+  const institution = inferInstitution(rawQuestion, objectRole);
+  const time = normalizeTimeframe(timeframe) || extractTimeframeFromQuestion(rawQuestion);
 
-  if (object) {
-    return object;
-  }
+  const baseQuestion = `Will the courts release ${person} from ${institution}`;
 
-  if (raw.includes("this app")) {
-    return "this app";
-  }
-
-  if (raw.includes("wwg app")) {
-    return "the WWG app";
-  }
-
-  if (raw.includes("app")) {
-    return "the app";
-  }
-
-  return "the matter";
+  return cleanDischargeQuestion(
+    time ? `${baseQuestion} within ${time}` : baseQuestion,
+    time
+  );
 }
 
 function inferOutcomePhrase(rawQuestion, clarifiedIntent, detectedIntentId) {
@@ -630,35 +719,21 @@ function inferOutcomePhrase(rawQuestion, clarifiedIntent, detectedIntentId) {
     combined.includes("money") ||
     combined.includes("profit") ||
     combined.includes("revenue") ||
-    combined.includes("income")
+    combined.includes("income") ||
+    combined.includes("make money")
   ) {
     return "generate profit";
   }
 
-  if (combined.includes("make money")) {
-    return "generate profit";
-  }
-
-  if (detectedIntentId === "discharge") {
-    return "be discharged";
-  }
-
+  if (detectedIntentId === "discharge") return "be discharged";
   if (detectedIntentId === "relationship") {
     return "remain stable and develop positively";
   }
-
-  if (detectedIntentId === "health") {
-    return "improve";
-  }
-
+  if (detectedIntentId === "health") return "improve";
   if (detectedIntentId === "career") {
     return "produce a favorable career outcome";
   }
-
-  if (detectedIntentId === "lostObject") {
-    return "be found";
-  }
-
+  if (detectedIntentId === "lostObject") return "be found";
   if (detectedIntentId === "personalReadiness") {
     return "be maintained successfully";
   }
@@ -812,11 +887,10 @@ export function buildFinalCastingQuestionSuggestion({
   const intent = clean(clarifiedIntent);
   const self = clean(selfRole);
   const object = clean(objectRole);
-  const time = normalizeTimeframe(timeframe);
+  const inferredTime = extractTimeframeFromQuestion(raw);
+  const time = normalizeTimeframe(timeframe) || inferredTime;
 
-  if (!raw && !intent && !object) {
-    return "";
-  }
+  if (!raw && !intent && !object) return "";
 
   const detectedIntent = detectQuestionIntent([raw, intent, object].join(" "));
   const cleanBase = removeDuplicateTimeframeFromQuestion(raw, time);
@@ -838,6 +912,10 @@ export function buildFinalCastingQuestionSuggestion({
   }
 
   if (detectedIntent.id === "discharge") {
+    if (isLegalDischargeQuestion(raw)) {
+      return buildLegalDischargeQuestion(raw, self, object, time);
+    }
+
     const person = inferDischargePerson(raw, self);
     const institution = inferInstitution(raw, object);
 
@@ -873,7 +951,10 @@ export function buildFinalCastingQuestionSuggestion({
     const baseRelationshipQuestion = `Will ${relationshipSubject} remain stable and develop positively`;
 
     if (time) {
-      return cleanRelationshipQuestion(`${baseRelationshipQuestion} over ${time}`, time);
+      return cleanRelationshipQuestion(
+        `${baseRelationshipQuestion} over ${time}`,
+        time
+      );
     }
 
     return cleanRelationshipQuestion(baseRelationshipQuestion, time);
@@ -929,9 +1010,24 @@ export function analyzeQuestionRefinement({
   const facts = clean(knownFacts);
   const assumptionText = clean(assumptions);
   const emotion = clean(emotionalTone);
-  const self = clean(selfRole);
-  const object = clean(objectRole);
-  const time = normalizeTimeframe(timeframe);
+
+  const inferredTimeframe = extractTimeframeFromQuestion(raw);
+  const preliminaryIntent = detectQuestionIntent(
+    [raw, intentText, objectRole].join(" "),
+    selectedIntent
+  );
+
+  const inferredSelf =
+    preliminaryIntent.id === "discharge" ? inferDischargePerson(raw, selfRole) : "";
+  const inferredObject =
+    preliminaryIntent.id === "discharge" ? inferInstitution(raw, objectRole) : "";
+
+  const self = clean(selfRole) || (inferredSelf !== "the person" ? inferredSelf : "");
+  const object =
+    clean(objectRole) ||
+    (inferredObject !== "the institution" ? inferredObject : "");
+  const time = normalizeTimeframe(timeframe) || inferredTimeframe;
+
   const explicitFinalQuestion = clean(finalCastingQuestion);
 
   const suggestedFinalQuestion = buildFinalCastingQuestionSuggestion({
@@ -988,6 +1084,8 @@ export function analyzeQuestionRefinement({
   if (!self) {
     warnings.push("Define Self so the chart knows the querent's position.");
     qualityFlags.push("missing-self");
+  } else if (!clean(selfRole) && inferredSelf) {
+    strengths.push(`Self inferred from raw question: ${self}.`);
   } else {
     strengths.push("Self is defined.");
   }
@@ -995,6 +1093,8 @@ export function analyzeQuestionRefinement({
   if (!object) {
     warnings.push("Define the Object so the chart knows what is being judged.");
     qualityFlags.push("missing-object");
+  } else if (!clean(objectRole) && inferredObject) {
+    strengths.push(`Object inferred from raw question: ${object}.`);
   } else {
     strengths.push("Object is defined.");
   }
@@ -1002,6 +1102,8 @@ export function analyzeQuestionRefinement({
   if (!time && !hasTimeframe(analysisQuestion)) {
     warnings.push("Add a timeframe so the reading has a clear boundary.");
     qualityFlags.push("missing-timeframe");
+  } else if (!clean(timeframe) && inferredTimeframe) {
+    strengths.push(`Timeframe inferred from raw question: ${time}.`);
   } else {
     strengths.push("Timeframe is defined.");
   }
@@ -1062,10 +1164,10 @@ export function analyzeQuestionRefinement({
       points: 15,
       passed: Boolean(intentText || detectedIntent.id !== "general"),
     },
-    { key: "self-defined", points: 15, passed: Boolean(self) },
-    { key: "object-defined", points: 15, passed: Boolean(object) },
+    { key: "self-defined-or-inferred", points: 15, passed: Boolean(self) },
+    { key: "object-defined-or-inferred", points: 15, passed: Boolean(object) },
     {
-      key: "timeframe-defined",
+      key: "timeframe-defined-or-inferred",
       points: 15,
       passed: Boolean(time || hasTimeframe(analysisQuestion)),
     },
@@ -1118,6 +1220,9 @@ export function analyzeQuestionRefinement({
     selfRole: self,
     objectRole: object,
     timeframe: time,
+    inferredSelfRole: inferredSelf,
+    inferredObjectRole: inferredObject,
+    inferredTimeframe,
     finalCastingQuestion: finalQuestion,
     suggestedFinalQuestion,
     selectedIntent: selectedIntent || "",
