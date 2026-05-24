@@ -32,6 +32,33 @@ const INTENT_OPTIONS = [
     ],
   },
   {
+    id: "discharge",
+    label: "Institution / Discharge / Release",
+    methodHint: "TDM",
+    focusHint: "Moving line",
+    keywords: [
+      "nursing home",
+      "hospital",
+      "facility",
+      "institution",
+      "rehab",
+      "care home",
+      "assisted living",
+      "placement",
+      "custody",
+      "detention",
+      "released",
+      "release",
+      "discharged",
+      "discharge",
+      "get out",
+      "leave",
+      "come home",
+      "return home",
+      "move out",
+    ],
+  },
+  {
     id: "career",
     label: "Career / Authority / Official Matter",
     methodHint: "RIDM",
@@ -136,7 +163,7 @@ const INTENT_OPTIONS = [
     id: "timing",
     label: "Timing / When",
     methodHint: "TDM",
-    focusHint: "Using recommended focus",
+    focusHint: "Moving line",
     keywords: [
       "when",
       "timing",
@@ -498,6 +525,80 @@ function inferRelationshipSubject(rawQuestion, objectRole) {
   return object || "the relationship";
 }
 
+function inferDischargePerson(rawQuestion, selfRole) {
+  const raw = clean(rawQuestion);
+  const self = clean(selfRole);
+
+  if (self) {
+    return self;
+  }
+
+  const willMatch = raw.match(/^will\s+(.+?)\s+(get out|leave|be discharged|be released|come home|return home|move out)/i);
+
+  if (willMatch?.[1]) {
+    return willMatch[1].trim();
+  }
+
+  return "the person";
+}
+
+function inferInstitution(rawQuestion, objectRole) {
+  const raw = lower(rawQuestion);
+  const object = clean(objectRole);
+
+  if (object) {
+    return object;
+  }
+
+  const institutionPatterns = [
+    "nursing home",
+    "hospital",
+    "facility",
+    "institution",
+    "rehab",
+    "care home",
+    "assisted living",
+    "placement",
+    "custody",
+    "detention",
+  ];
+
+  const found = institutionPatterns.find((item) => raw.includes(item));
+
+  if (found) {
+    return found;
+  }
+
+  return "the institution";
+}
+
+function cleanDischargeQuestion(question, timeframe) {
+  let result = normalizeSpaces(stripTrailingQuestionMarks(question));
+  const normalizedTimeframe = normalizeTimeframe(timeframe);
+
+  if (normalizedTimeframe) {
+    const escapedTimeframe = timeframeToRegexText(normalizedTimeframe);
+
+    result = result.replace(
+      new RegExp(
+        `(within|over|in)\\s+${escapedTimeframe}\\s+(within|over|in)\\s+${escapedTimeframe}$`,
+        "i"
+      ),
+      `within ${normalizedTimeframe}`
+    );
+
+    result = result.replace(
+      new RegExp(
+        `(within|over|in)\\s+${escapedTimeframe}\\s+${escapedTimeframe}$`,
+        "i"
+      ),
+      `within ${normalizedTimeframe}`
+    );
+  }
+
+  return addQuestionMark(result);
+}
+
 function inferCleanSubject(rawQuestion, objectRole) {
   const raw = lower(rawQuestion);
   const object = clean(objectRole);
@@ -536,6 +637,10 @@ function inferOutcomePhrase(rawQuestion, clarifiedIntent, detectedIntentId) {
 
   if (combined.includes("make money")) {
     return "generate profit";
+  }
+
+  if (detectedIntentId === "discharge") {
+    return "be discharged";
   }
 
   if (detectedIntentId === "relationship") {
@@ -730,6 +835,23 @@ export function buildFinalCastingQuestionSuggestion({
     }
 
     return `Will ${cleanSubject} generate profit?`;
+  }
+
+  if (detectedIntent.id === "discharge") {
+    const person = inferDischargePerson(raw, self);
+    const institution = inferInstitution(raw, object);
+
+    if (time) {
+      return cleanDischargeQuestion(
+        `Will ${person} be discharged from ${institution} within ${time}`,
+        time
+      );
+    }
+
+    return cleanDischargeQuestion(
+      `Will ${person} be discharged from ${institution}`,
+      time
+    );
   }
 
   if (detectedIntent.id === "relationship") {
