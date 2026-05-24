@@ -59,6 +59,8 @@ import {
   buildSnapshotCompareText,
 } from "./logic/snapshotCompareLogic";
 
+const VALID_METHOD_IDS = ["GLDM", "TDM", "RIDM", "CDM", "ADM"];
+
 function renderLineByValue(value) {
   if (value === "yang") {
     return <div className="hex-line yang-line" />;
@@ -398,12 +400,30 @@ function App() {
     ]
   );
 
+  useEffect(() => {
+    const methodHint = questionRefinement.methodHints?.[0];
+
+    if (VALID_METHOD_IDS.includes(methodHint) && selectedMethod !== methodHint) {
+      setSelectedMethod(methodHint);
+      setManualFocus("");
+      setCopied(false);
+      setSnapshotStatus(`Method auto-synced to ${methodHint}.`);
+      setDeleteConfirmArmed(false);
+    }
+  }, [questionRefinement.methodHints, selectedMethod]);
+
   const questionForLogic = question || rawQuestion;
 
-  const recommendedMethodId = useMemo(
+  const fallbackRecommendedMethodId = useMemo(
     () => recommendMethod(questionForLogic),
     [questionForLogic]
   );
+
+  const recommendedMethodId = VALID_METHOD_IDS.includes(
+    questionRefinement.methodHints?.[0]
+  )
+    ? questionRefinement.methodHints[0]
+    : fallbackRecommendedMethodId;
 
   const recommendedMethod = methods.find(
     (item) => item.id === recommendedMethodId
@@ -417,6 +437,44 @@ function App() {
   const selectedFocusInfo = focusOptions.find(
     (focus) => focus.key === selectedFocus
   );
+
+  const calendarContext = buildCalendarContext({
+    castingDate,
+    castingTime,
+    dayChangeRule,
+
+    manualCalendarMode,
+    manualMonthBranch,
+    manualDayBranch,
+    manualDayStem,
+    manualDayVoid,
+
+    monthBranchContext,
+    dayBranchContext,
+    voidPairContext,
+  });
+
+  const {
+    source: calendarSource,
+    sourceLabel: calendarSourceLabel,
+    statusLabel: calendarStatusLabel,
+    statusNote: calendarStatusNote,
+    automaticCalendar,
+
+    activeMonthBranchKey,
+    activeDayBranchKey,
+    activeVoidPairKey,
+
+    monthBranch,
+    dayBranch,
+    dayStem,
+    voidPair,
+
+    manualMonthBranchData,
+    manualDayBranchData,
+    manualDayStemData,
+    manualDayVoidData,
+  } = calendarContext;
 
   const warnings = getQuestionWarnings(
     question,
@@ -468,31 +526,6 @@ function App() {
 
   const originalHexagram = getHexagramInfo(originalValues);
   const transformedHexagram = getHexagramInfo(transformedValues);
-
-  const calendarContext = buildCalendarContext({
-    manualCalendarMode,
-    manualMonthBranch,
-    manualDayBranch,
-    manualDayStem,
-    manualDayVoid,
-    monthBranchContext,
-    dayBranchContext,
-    voidPairContext,
-  });
-
-  const {
-    source: calendarSource,
-    activeMonthBranchKey,
-    activeDayBranchKey,
-    activeVoidPairKey,
-    monthBranch,
-    dayBranch,
-    voidPair,
-    manualMonthBranchData,
-    manualDayBranchData,
-    manualDayStemData,
-    manualDayVoidData,
-  } = calendarContext;
 
   const sixKinRows = lineBranches.map((branchKey, index) => {
     const branch = earthlyBranches.find((item) => item.key === branchKey);
@@ -847,11 +880,30 @@ function App() {
     }
 
     setQuestion(questionRefinement.suggestedFinalQuestion);
-    setSnapshotStatus("Suggested final casting question applied.");
+
+    const methodHint = questionRefinement.methodHints?.[0];
+
+    if (VALID_METHOD_IDS.includes(methodHint)) {
+      setSelectedMethod(methodHint);
+      setManualFocus("");
+      setSnapshotStatus(
+        `Suggested final casting question applied. Method synced to ${methodHint}.`
+      );
+    } else {
+      setSnapshotStatus("Suggested final casting question applied.");
+    }
+
     setDeleteConfirmArmed(false);
   }
 
   function castReadingWithCoins() {
+    const methodHint = questionRefinement.methodHints?.[0];
+
+    if (VALID_METHOD_IDS.includes(methodHint) && selectedMethod !== methodHint) {
+      setSelectedMethod(methodHint);
+      setManualFocus("");
+    }
+
     const casting = castSixLinesWithCoins();
 
     setLines(casting.lines);
@@ -1669,9 +1721,17 @@ function App() {
 
           <p>
             <strong>Gregorian input:</strong>{" "}
-            {castingDate && castingTime
-              ? `${castingDate} at ${castingTime}`
-              : "Waiting for date and time."}
+            {castingDate
+              ? `${castingDate}${castingTime ? ` at ${castingTime}` : ""}`
+              : "Waiting for date."}
+          </p>
+
+          <p>
+            <strong>Calendar-adjusted day:</strong>{" "}
+            {automaticCalendar?.dateParts?.dateKey || "Not calculated yet"}
+            {automaticCalendar?.dateParts?.dayAdjustedByRule
+              ? " — adjusted by 23:00 day-change rule"
+              : ""}
           </p>
 
           <p>
@@ -1680,29 +1740,22 @@ function App() {
           </p>
 
           <p>
-            <strong>Chinese month branch:</strong>{" "}
-            {manualCalendarMode
-              ? `${manualMonthBranchData.label} / ${manualMonthBranchData.element}`
-              : "Pending calculation"}
+            <strong>Chinese month branch:</strong> {monthBranch.label} /{" "}
+            {monthBranch.element}
           </p>
 
           <p>
-            <strong>Chinese day stem:</strong>{" "}
-            {manualCalendarMode
-              ? `${manualDayStemData.label} / ${manualDayStemData.element}, ${manualDayStemData.polarity}`
-              : "Pending calculation"}
+            <strong>Chinese day stem:</strong> {dayStem.label} /{" "}
+            {dayStem.element}, {dayStem.polarity}
           </p>
 
           <p>
-            <strong>Chinese day branch:</strong>{" "}
-            {manualCalendarMode
-              ? `${manualDayBranchData.label} / ${manualDayBranchData.element}`
-              : "Pending calculation"}
+            <strong>Chinese day branch:</strong> {dayBranch.label} /{" "}
+            {dayBranch.element}
           </p>
 
           <p>
-            <strong>Dekad void:</strong>{" "}
-            {manualCalendarMode ? manualDayVoidData.label : "Pending calculation"}
+            <strong>Dekad void:</strong> {voidPair.label}
           </p>
 
           <p>
@@ -1710,10 +1763,15 @@ function App() {
           </p>
 
           <p>
-            <strong>Calendar source:</strong>{" "}
-            {calendarSource === "manual"
-              ? "Manual override"
-              : "Automatic engine pending"}
+            <strong>Calendar source:</strong> {calendarSourceLabel}
+          </p>
+
+          <p>
+            <strong>Calendar status:</strong> {calendarStatusLabel}
+          </p>
+
+          <p>
+            <strong>Note:</strong> {calendarStatusNote}
           </p>
         </div>
       </section>
