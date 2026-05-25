@@ -158,6 +158,56 @@ function getLineLabel(lineKey) {
   return lineTypes[lineKey]?.label || "Unknown line";
 }
 
+function buildManualHexagramExportSummary({
+  manualHexagramNumber,
+  manualHexagramMovingLines,
+  lines,
+  originalHexagram,
+  transformedHexagram,
+  movingLines,
+}) {
+  const lineResults =
+    lines
+      .map((lineKey, index) => {
+        const lineType = lineTypes[lineKey];
+        return `Line ${index + 1}: ${lineType?.label || lineKey}`;
+      })
+      .join("\n") || "No lines available.";
+
+  const movingLinesText =
+    movingLines.length > 0
+      ? movingLines.map((lineNumber) => `Line ${lineNumber}`).join(", ")
+      : "None";
+
+  return `CASTING MODE
+
+Current mode:
+Manual Hexagram Entry
+
+Original hexagram input:
+${manualHexagramNumber || "Not recorded"}
+
+Moving lines input:
+${manualHexagramMovingLines || "None"}
+
+Applied chart:
+Original Hexagram: #${originalHexagram.kingWen.number} — ${
+    originalHexagram.kingWen.name
+  } / ${originalHexagram.kingWen.english}
+Transformed Hexagram: #${transformedHexagram.kingWen.number} — ${
+    transformedHexagram.kingWen.name
+  } / ${transformedHexagram.kingWen.english}
+
+Line results:
+${lineResults}
+
+Moving lines:
+${movingLinesText}
+
+Casting note:
+This chart was entered through Manual Hexagram Entry. The original King Wen hexagram number and moving lines were used to populate the six-line structure and calculate the transformed hexagram.`;
+}
+
 function buildSnapshotDetailsText(snapshot) {
   const linesText =
     (snapshot.lines || [])
@@ -619,10 +669,33 @@ function App() {
     movingLines,
   });
 
-  const coinCastingSummary = useMemo(
-    () => buildCoinCastingSummary(coinCastingHistory),
-    [coinCastingHistory]
-  );
+  const castingModeSummary = useMemo(() => {
+    if (coinCastingHistory.length > 0) {
+      return buildCoinCastingSummary(coinCastingHistory);
+    }
+
+    if (manualHexagramStatus) {
+      return buildManualHexagramExportSummary({
+        manualHexagramNumber,
+        manualHexagramMovingLines,
+        lines,
+        originalHexagram,
+        transformedHexagram,
+        movingLines,
+      });
+    }
+
+    return buildCoinCastingSummary([]);
+  }, [
+    coinCastingHistory,
+    manualHexagramStatus,
+    manualHexagramNumber,
+    manualHexagramMovingLines,
+    lines,
+    originalHexagram,
+    transformedHexagram,
+    movingLines,
+  ]);
 
   const visibleSnapshots = useMemo(() => {
     const cleanSearch = snapshotSearch.trim().toLowerCase();
@@ -756,8 +829,8 @@ function App() {
     () =>
       `${buildQuestionRefinementSummary(
         questionRefinement
-      )}\n\n${coinCastingSummary}\n\n${baseReadingSummary}`,
-    [questionRefinement, coinCastingSummary, baseReadingSummary]
+      )}\n\n${castingModeSummary}\n\n${baseReadingSummary}`,
+    [questionRefinement, castingModeSummary, baseReadingSummary]
   );
 
   function updateLine(index, value) {
