@@ -1,403 +1,75 @@
 const SHI_YING_BY_HEXAGRAM_NUMBER = {
-  // Qian Palace
-  1: {
-    palace: "Qian Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  44: {
-    palace: "Qian Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  33: {
-    palace: "Qian Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  12: {
-    palace: "Qian Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  20: {
-    palace: "Qian Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  23: {
-    palace: "Qian Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  35: {
-    palace: "Qian Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  14: {
-    palace: "Qian Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  1: { palace: "Qian Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  44: { palace: "Qian Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  33: { palace: "Qian Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  12: { palace: "Qian Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  20: { palace: "Qian Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  23: { palace: "Qian Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  35: { palace: "Qian Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  14: { palace: "Qian Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Kan Palace
-  29: {
-    palace: "Kan Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  60: {
-    palace: "Kan Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  3: {
-    palace: "Kan Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  63: {
-    palace: "Kan Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  49: {
-    palace: "Kan Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  55: {
-    palace: "Kan Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  36: {
-    palace: "Kan Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  7: {
-    palace: "Kan Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  29: { palace: "Kan Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  60: { palace: "Kan Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  3: { palace: "Kan Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  63: { palace: "Kan Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  49: { palace: "Kan Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  55: { palace: "Kan Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  36: { palace: "Kan Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  7: { palace: "Kan Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Gen Palace
-  52: {
-    palace: "Gen Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  22: {
-    palace: "Gen Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  26: {
-    palace: "Gen Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  41: {
-    palace: "Gen Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  38: {
-    palace: "Gen Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  10: {
-    palace: "Gen Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  61: {
-    palace: "Gen Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  53: {
-    palace: "Gen Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  52: { palace: "Gen Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  22: { palace: "Gen Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  26: { palace: "Gen Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  41: { palace: "Gen Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  38: { palace: "Gen Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  10: { palace: "Gen Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  61: { palace: "Gen Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  53: { palace: "Gen Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Zhen Palace
-  51: {
-    palace: "Zhen Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  16: {
-    palace: "Zhen Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  40: {
-    palace: "Zhen Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  32: {
-    palace: "Zhen Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  46: {
-    palace: "Zhen Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  48: {
-    palace: "Zhen Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  28: {
-    palace: "Zhen Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  17: {
-    palace: "Zhen Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  51: { palace: "Zhen Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  16: { palace: "Zhen Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  40: { palace: "Zhen Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  32: { palace: "Zhen Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  46: { palace: "Zhen Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  48: { palace: "Zhen Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  28: { palace: "Zhen Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  17: { palace: "Zhen Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Xun Palace
-  57: {
-    palace: "Xun Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  9: {
-    palace: "Xun Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  37: {
-    palace: "Xun Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  42: {
-    palace: "Xun Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  25: {
-    palace: "Xun Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  21: {
-    palace: "Xun Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  27: {
-    palace: "Xun Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  18: {
-    palace: "Xun Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  57: { palace: "Xun Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  9: { palace: "Xun Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  37: { palace: "Xun Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  42: { palace: "Xun Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  25: { palace: "Xun Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  21: { palace: "Xun Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  27: { palace: "Xun Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  18: { palace: "Xun Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Li Palace
-  30: {
-    palace: "Li Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  56: {
-    palace: "Li Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  50: {
-    palace: "Li Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  64: {
-    palace: "Li Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  4: {
-    palace: "Li Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  59: {
-    palace: "Li Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  6: {
-    palace: "Li Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  13: {
-    palace: "Li Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  30: { palace: "Li Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  56: { palace: "Li Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  50: { palace: "Li Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  64: { palace: "Li Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  4: { palace: "Li Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  59: { palace: "Li Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  6: { palace: "Li Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  13: { palace: "Li Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Kun Palace
-  2: {
-    palace: "Kun Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  24: {
-    palace: "Kun Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  19: {
-    palace: "Kun Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  11: {
-    palace: "Kun Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  34: {
-    palace: "Kun Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  43: {
-    palace: "Kun Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  5: {
-    palace: "Kun Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  8: {
-    palace: "Kun Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  2: { palace: "Kun Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  24: { palace: "Kun Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  19: { palace: "Kun Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  11: { palace: "Kun Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  34: { palace: "Kun Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  43: { palace: "Kun Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  5: { palace: "Kun Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  8: { palace: "Kun Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 
-  // Dui Palace
-  58: {
-    palace: "Dui Palace",
-    stage: "Pure palace hexagram",
-    shiLine: 6,
-    yingLine: 3,
-  },
-  47: {
-    palace: "Dui Palace",
-    stage: "First-generation hexagram",
-    shiLine: 1,
-    yingLine: 4,
-  },
-  45: {
-    palace: "Dui Palace",
-    stage: "Second-generation hexagram",
-    shiLine: 2,
-    yingLine: 5,
-  },
-  31: {
-    palace: "Dui Palace",
-    stage: "Third-generation hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
-  39: {
-    palace: "Dui Palace",
-    stage: "Fourth-generation hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  15: {
-    palace: "Dui Palace",
-    stage: "Fifth-generation hexagram",
-    shiLine: 5,
-    yingLine: 2,
-  },
-  62: {
-    palace: "Dui Palace",
-    stage: "Wandering-soul hexagram",
-    shiLine: 4,
-    yingLine: 1,
-  },
-  54: {
-    palace: "Dui Palace",
-    stage: "Returning-soul hexagram",
-    shiLine: 3,
-    yingLine: 6,
-  },
+  58: { palace: "Dui Palace", stage: "Pure palace hexagram", shiLine: 6, yingLine: 3 },
+  47: { palace: "Dui Palace", stage: "First-generation hexagram", shiLine: 1, yingLine: 4 },
+  45: { palace: "Dui Palace", stage: "Second-generation hexagram", shiLine: 2, yingLine: 5 },
+  31: { palace: "Dui Palace", stage: "Third-generation hexagram", shiLine: 3, yingLine: 6 },
+  39: { palace: "Dui Palace", stage: "Fourth-generation hexagram", shiLine: 4, yingLine: 1 },
+  15: { palace: "Dui Palace", stage: "Fifth-generation hexagram", shiLine: 5, yingLine: 2 },
+  62: { palace: "Dui Palace", stage: "Wandering-soul hexagram", shiLine: 4, yingLine: 1 },
+  54: { palace: "Dui Palace", stage: "Returning-soul hexagram", shiLine: 3, yingLine: 6 },
 };
 
 function getHexagramNumber(hexagram) {
@@ -406,16 +78,23 @@ function getHexagramNumber(hexagram) {
 
 function getShiYingInfo(hexagram) {
   const hexagramNumber = getHexagramNumber(hexagram);
+  const tableEntry = SHI_YING_BY_HEXAGRAM_NUMBER[hexagramNumber];
 
-  return (
-    SHI_YING_BY_HEXAGRAM_NUMBER[hexagramNumber] || {
-      palace: hexagram?.palace?.palace || "Unknown Palace",
-      stage: "Unknown palace stage",
-      shiLine: 3,
-      yingLine: 6,
-      fallback: true,
-    }
-  );
+  if (tableEntry) {
+    return {
+      ...tableEntry,
+      hexagramNumber,
+    };
+  }
+
+  return {
+    hexagramNumber,
+    palace: hexagram?.palace?.palace || "Unknown Palace",
+    stage: "Unknown palace stage",
+    shiLine: 3,
+    yingLine: 6,
+    fallback: true,
+  };
 }
 
 function getLineByNumber(sixKinRows, lineNumber) {
@@ -589,7 +268,7 @@ export function buildPalaceRulesPreview({
     {
       title: "Hidden / Flying spirit placeholder",
       text:
-        "Hidden Spirit / 伏神 and Flying Spirit / 飞神 logic is not active yet. This section now has true Shi/Ying line positions, so the next palace layer can compare concealed useful spirits against Shi, Ying, moving lines, and covering lines.",
+        "Hidden Spirit / 伏神 and Flying Spirit / 飞神 logic is now entering foundation mode. Future upgrades should compare concealed useful spirits against Shi, Ying, moving lines, and covering lines with a complete traditional table.",
     },
   ];
 
@@ -602,6 +281,9 @@ export function buildPalaceRulesPreview({
   } ${movingRelationship}`;
 
   return {
+    originalHexagramNumber: originalShiYing.hexagramNumber,
+    transformedHexagramNumber: transformedShiYing.hexagramNumber,
+
     originalPalace: originalHexagram?.palace?.palace || "Unknown Palace",
     originalElement: originalHexagram?.palace?.element || "Unknown",
     transformedPalace: transformedHexagram?.palace?.palace || "Unknown Palace",
