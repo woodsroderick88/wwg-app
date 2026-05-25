@@ -25,6 +25,7 @@ import {
   getCoinCastingLegend,
 } from "./logic/castingLogic";
 import { buildCalendarContext } from "./logic/calendarEngine";
+import { buildCalendarConfidence } from "./logic/calendarConfidenceLogic";
 import { buildReadingSummary } from "./logic/exportSummaryLogic";
 import {
   applyPresetToAppState,
@@ -359,6 +360,27 @@ function RecommendationList({ items, fallback }) {
   );
 }
 
+function CalendarConfidenceCard({ calendarConfidence }) {
+  if (!calendarConfidence) {
+    return null;
+  }
+
+  return (
+    <div className="recommendation-card">
+      <strong>Calendar Confidence</strong>
+      <p>
+        {calendarConfidence.level} — {calendarConfidence.score}/100
+      </p>
+      <p>{calendarConfidence.summary}</p>
+      {calendarConfidence.warning ? (
+        <p>
+          <strong>Warning:</strong> {calendarConfidence.warning}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function App() {
   const [rawQuestion, setRawQuestion] = useState("");
   const [clarifiedIntent, setClarifiedIntent] = useState("");
@@ -376,8 +398,7 @@ function App() {
   const [lines, setLines] = useState(defaultLines);
   const [lineBranches, setLineBranches] = useState(defaultLineBranches);
   const [coinCastingHistory, setCoinCastingHistory] = useState([]);
-
-  const [manualHexagramNumber, setManualHexagramNumber] = useState("");
+    const [manualHexagramNumber, setManualHexagramNumber] = useState("");
   const [manualHexagramMovingLines, setManualHexagramMovingLines] = useState("");
   const [manualHexagramStatus, setManualHexagramStatus] = useState("");
 
@@ -541,6 +562,17 @@ function App() {
     manualDayVoidData,
   } = calendarContext;
 
+  const calendarConfidence = buildCalendarConfidence({
+    castingDate,
+    castingTime,
+    location,
+    manualCalendarMode,
+    calendarSource,
+    calendarSourceLabel,
+    calendarStatusLabel,
+    calendarStatusNote,
+  });
+
   const warnings = getQuestionWarnings(
     question,
     selfRole,
@@ -650,6 +682,7 @@ function App() {
     conflictReport,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const palaceRules = buildPalaceRulesPreview({
@@ -763,6 +796,7 @@ function App() {
         location,
         dayChangeRule,
         calendarSource,
+        calendarConfidence,
         manualCalendarMode,
         manualMonthBranchData,
         manualDayBranchData,
@@ -801,6 +835,7 @@ function App() {
       location,
       dayChangeRule,
       calendarSource,
+      calendarConfidence,
       manualCalendarMode,
       manualMonthBranchData,
       manualDayBranchData,
@@ -879,8 +914,7 @@ function App() {
     setEmotionalTone("");
     setSelectedQuestionIntent("");
   }
-
-  function resetCurrentReading() {
+    function resetCurrentReading() {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
     setManualHexagramNumber("");
@@ -1305,8 +1339,7 @@ function App() {
     setSnapshotStatus("");
     setDeleteConfirmArmed(false);
   }
-
-  function exportSavedSnapshots() {
+    function exportSavedSnapshots() {
     if (savedSnapshots.length === 0) {
       setSnapshotStatus("No saved readings to export.");
       setDeleteConfirmArmed(false);
@@ -1639,7 +1672,7 @@ function App() {
         )}
       </section>
 
-      <section className="panel">
+            <section className="panel">
         <h2>2. Choose the reading method</h2>
 
         <div className="recommendation-box">
@@ -1894,6 +1927,10 @@ function App() {
             <strong>Note:</strong> {calendarStatusNote}
           </p>
         </div>
+
+        <div className="recommendation-grid">
+          <CalendarConfidenceCard calendarConfidence={calendarConfidence} />
+        </div>
       </section>
 
       <section className="panel">
@@ -1916,8 +1953,7 @@ function App() {
           </p>
         )}
       </section>
-
-      <section className="panel">
+            <section className="panel">
         <h2>6. Line Entry / Chart Builder</h2>
         <p className="section-note">
           Cast six lines automatically with the three-coin method, manually
@@ -2167,8 +2203,7 @@ function App() {
             </p>
           </div>
         </div>
-
-        <div className="six-kins-panel">
+                <div className="six-kins-panel">
           <h3>Earthly Branch + Six-Kins Assignment</h3>
 
           <div className="field-grid">
@@ -2340,6 +2375,8 @@ function App() {
             <p>{recommendation.finalJudgment || recommendation.result}</p>
           </div>
 
+          <CalendarConfidenceCard calendarConfidence={calendarConfidence} />
+
           <div className="recommendation-card">
             <strong>Supporting Signs</strong>
             <RecommendationList
@@ -2407,8 +2444,7 @@ function App() {
           <strong>Palace summary:</strong> {palaceRules.summary}
         </div>
       </section>
-
-      <section className="panel hidden-spirit-panel">
+            <section className="panel hidden-spirit-panel">
         <h2>11. Hidden / Flying Spirit Preview</h2>
         <div className="recommendation-grid">
           <div className="recommendation-card">
@@ -2488,6 +2524,13 @@ function App() {
           <p>
             <strong>Confidence:</strong>{" "}
             {recommendation.confidence || conflictReport.confidence}
+          </p>
+          <p>
+            <strong>Calendar confidence:</strong> {calendarConfidence.level} —{" "}
+            {calendarConfidence.score}/100
+          </p>
+          <p>
+            <strong>Calendar note:</strong> {calendarConfidence.summary}
           </p>
           <p>
             <strong>Result meaning:</strong>{" "}
@@ -2711,8 +2754,8 @@ function App() {
               </button>
             </label>
           </div>
-
-          {compareSameReading ? (
+          send App.jsx part 9 and I’ll send the final part.
+                    {compareSameReading ? (
             <p className="section-note" style={{ textAlign: "center" }}>
               Choose two different saved readings to compare.
             </p>

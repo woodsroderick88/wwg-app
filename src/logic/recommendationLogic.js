@@ -56,6 +56,44 @@ function isParentFocus(selectedFocus) {
   return String(selectedFocus || "").toLowerCase() === "parent-line";
 }
 
+function getCalendarLevel(calendarConfidence) {
+  return String(calendarConfidence?.level || "").toLowerCase();
+}
+
+function isLowCalendarConfidence(calendarConfidence) {
+  const level = getCalendarLevel(calendarConfidence);
+
+  return (
+    level === "low" ||
+    calendarConfidence?.isFallback ||
+    calendarConfidence?.isReliableForTiming === false
+  );
+}
+
+function getCalendarWarning(calendarConfidence) {
+  if (!calendarConfidence) {
+    return "";
+  }
+
+  if (calendarConfidence.warning) {
+    return calendarConfidence.warning;
+  }
+
+  if (calendarConfidence.summary) {
+    return calendarConfidence.summary;
+  }
+
+  return "";
+}
+
+function buildCalendarSupportingNote(calendarConfidence) {
+  if (!calendarConfidence) {
+    return "";
+  }
+
+  return `Calendar confidence: ${calendarConfidence.level} — ${calendarConfidence.summary}`;
+}
+
 function buildHiddenParentCandidateText(movingLines) {
   const candidates = [];
 
@@ -82,7 +120,13 @@ function buildHiddenParentCandidateText(movingLines) {
   return candidates;
 }
 
-function buildBaseSignals({ selectedFocus, focusRows, movingLines, clarityScore }) {
+function buildBaseSignals({
+  selectedFocus,
+  focusRows,
+  movingLines,
+  clarityScore,
+  calendarConfidence,
+}) {
   const focusLineNumbers = getFocusLineNumbers(focusRows);
   const supported = hasSupportedFocus(focusRows);
   const weakened = hasWeakenedFocus(focusRows);
@@ -146,6 +190,18 @@ function buildBaseSignals({ selectedFocus, focusRows, movingLines, clarityScore 
     );
   }
 
+  if (calendarConfidence) {
+    const calendarNote = buildCalendarSupportingNote(calendarConfidence);
+
+    if (calendarNote) {
+      supportingSigns.push(calendarNote);
+    }
+
+    if (isLowCalendarConfidence(calendarConfidence)) {
+      warningSigns.push(getCalendarWarning(calendarConfidence));
+    }
+  }
+
   return {
     focusLineNumbers,
     supported,
@@ -168,8 +224,17 @@ function getConfidence({
   movingFocus,
   hasMovingLines,
   clarityScore,
+  calendarConfidence,
 }) {
   if (clarityScore < 50) {
+    return "Low";
+  }
+
+  if (isLowCalendarConfidence(calendarConfidence)) {
+    if (focusRows.length === 0 && hasMovingLines && clarityScore >= 70) {
+      return "Medium-Low";
+    }
+
     return "Low";
   }
 
@@ -237,6 +302,18 @@ function getFinalJudgment({
   return "Cautious Yes";
 }
 
+function addCalendarMeaning(plainMeaning, calendarConfidence) {
+  if (!calendarConfidence) {
+    return plainMeaning;
+  }
+
+  if (isLowCalendarConfidence(calendarConfidence)) {
+    return `${plainMeaning} Calendar confidence is low, so this should be treated as a structural chart reading rather than a final timing judgment until the casting date and time are entered.`;
+  }
+
+  return `${plainMeaning} Calendar confidence is ${calendarConfidence.level}, so timing-related details should be weighed according to that confidence level.`;
+}
+
 function buildHousingRecommendation({
   selectedFocus,
   focusRows,
@@ -244,12 +321,14 @@ function buildHousingRecommendation({
   ruleConclusion,
   movingLines,
   clarityScore,
+  calendarConfidence,
 }) {
   const signals = buildBaseSignals({
     selectedFocus,
     focusRows,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const finalJudgment = getFinalJudgment({
@@ -272,6 +351,7 @@ function buildHousingRecommendation({
     movingFocus: signals.movingFocus,
     hasMovingLines: signals.hasMovingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const hiddenParentCandidateText =
@@ -298,6 +378,8 @@ function buildHousingRecommendation({
     plainMeaning =
       "The chart is not clear enough for a reliable housing judgment yet. Complete the question, calendar, and line setup before relying on the result.";
   }
+
+  plainMeaning = addCalendarMeaning(plainMeaning, calendarConfidence);
 
   const supportingSigns =
     signals.supportingSigns.length > 0
@@ -332,6 +414,7 @@ function buildHousingRecommendation({
     result: finalJudgment,
     finalJudgment,
     confidence,
+    calendarConfidence,
     plainMeaning,
     reason: plainMeaning,
     risk:
@@ -342,7 +425,7 @@ function buildHousingRecommendation({
     warningSigns,
     action:
       "Keep moving the housing process forward. Apply, gather documents, verify eligibility, ask about waitlist timing, save confirmation numbers, and follow up consistently instead of waiting passively.",
-    nextCheck: `Next check: compare the hidden Parent-line candidates against Shi/Ying, moving lines, transformed hexagram, application documents, void/clash status, and full Hidden/Flying Spirit rules. ${getMovingLineText(
+    nextCheck: `Next check: compare the hidden Parent-line candidates against Shi/Ying, moving lines, transformed hexagram, application documents, void/clash status, full Hidden/Flying Spirit rules, and verified calendar timing. ${getMovingLineText(
       movingLines
     )}`,
   };
@@ -355,12 +438,14 @@ function buildMoneyRecommendation({
   ruleConclusion,
   movingLines,
   clarityScore,
+  calendarConfidence,
 }) {
   const signals = buildBaseSignals({
     selectedFocus,
     focusRows,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const finalJudgment = getFinalJudgment({
@@ -383,6 +468,7 @@ function buildMoneyRecommendation({
     movingFocus: signals.movingFocus,
     hasMovingLines: signals.hasMovingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   let plainMeaning =
@@ -402,10 +488,13 @@ function buildMoneyRecommendation({
       "The money/resource signal is not visible openly, but moving lines show process activity. This needs hidden-spirit confirmation before treating it as a gain signal.";
   }
 
+  plainMeaning = addCalendarMeaning(plainMeaning, calendarConfidence);
+
   return {
     result: finalJudgment,
     finalJudgment,
     confidence,
+    calendarConfidence,
     plainMeaning,
     reason: plainMeaning,
     risk:
@@ -421,7 +510,7 @@ function buildMoneyRecommendation({
           ],
     action:
       "Do not wait passively. Activate the money path through clearer positioning, direct action, pricing tests, outreach, follow-up, and removing friction.",
-    nextCheck: `Next check: analyze the Asset-line against moving lines, transformed hexagram, true prosperity rules, Shi/Ying placement, and hidden/flying spirit logic. ${getMovingLineText(
+    nextCheck: `Next check: analyze the Asset-line against moving lines, transformed hexagram, true prosperity rules, Shi/Ying placement, hidden/flying spirit logic, and verified calendar timing. ${getMovingLineText(
       movingLines
     )}`,
   };
@@ -434,12 +523,14 @@ function buildTimingRecommendation({
   ruleConclusion,
   movingLines,
   clarityScore,
+  calendarConfidence,
 }) {
   const signals = buildBaseSignals({
     selectedFocus,
     focusRows,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const finalJudgment = getFinalJudgment({
@@ -462,6 +553,7 @@ function buildTimingRecommendation({
     movingFocus: signals.movingFocus,
     hasMovingLines: signals.hasMovingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   let plainMeaning =
@@ -481,10 +573,13 @@ function buildTimingRecommendation({
       "The timing trigger is not visible as a clean focus line, but moving lines show process activity. Hidden/Flying Spirit and activation timing are needed before making a firm date judgment.";
   }
 
+  plainMeaning = addCalendarMeaning(plainMeaning, calendarConfidence);
+
   return {
     result: finalJudgment,
     finalJudgment,
     confidence,
+    calendarConfidence,
     plainMeaning,
     reason: plainMeaning,
     risk:
@@ -503,7 +598,7 @@ function buildTimingRecommendation({
           ],
     action:
       "Track the real-world trigger points. Watch for appointments, approvals, messages, paperwork, deadlines, and movement around the moving-line or activation period.",
-    nextCheck: `Next check: compare moving lines, day/month strength, void-filling, transformed lines, and Shi/Ying. ${getMovingLineText(
+    nextCheck: `Next check: compare moving lines, day/month strength, void-filling, transformed lines, Shi/Ying, and verified calendar timing. ${getMovingLineText(
       movingLines
     )}`,
   };
@@ -516,12 +611,14 @@ function buildRelationshipRecommendation({
   ruleConclusion,
   movingLines,
   clarityScore,
+  calendarConfidence,
 }) {
   const signals = buildBaseSignals({
     selectedFocus,
     focusRows,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const finalJudgment = getFinalJudgment({
@@ -544,6 +641,7 @@ function buildRelationshipRecommendation({
     movingFocus: signals.movingFocus,
     hasMovingLines: signals.hasMovingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   let plainMeaning =
@@ -563,10 +661,13 @@ function buildRelationshipRecommendation({
       "The relationship or external-object matter is not visible openly, but moving lines show process activity. Hidden/Flying Spirit rules are needed before making a firm judgment.";
   }
 
+  plainMeaning = addCalendarMeaning(plainMeaning, calendarConfidence);
+
   return {
     result: finalJudgment,
     finalJudgment,
     confidence,
+    calendarConfidence,
     plainMeaning,
     reason: plainMeaning,
     risk:
@@ -582,7 +683,7 @@ function buildRelationshipRecommendation({
           ],
     action:
       "Move forward carefully. Keep communication steady, act consistently, and watch for practical confirmation that the situation is developing well.",
-    nextCheck: `Next check: compare the focus against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic. ${getMovingLineText(
+    nextCheck: `Next check: compare the focus against Shi/Ying, moving lines, transformed hexagram, hidden/flying spirit logic, and verified calendar timing. ${getMovingLineText(
       movingLines
     )}`,
   };
@@ -595,12 +696,14 @@ function buildGenericRecommendation({
   ruleConclusion,
   movingLines,
   clarityScore,
+  calendarConfidence,
 }) {
   const signals = buildBaseSignals({
     selectedFocus,
     focusRows,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   const finalJudgment = getFinalJudgment({
@@ -623,6 +726,7 @@ function buildGenericRecommendation({
     movingFocus: signals.movingFocus,
     hasMovingLines: signals.hasMovingLines,
     clarityScore,
+    calendarConfidence,
   });
 
   let plainMeaning =
@@ -635,10 +739,13 @@ function buildGenericRecommendation({
       "The selected matter is not visible openly, but moving lines show active process movement. Hidden/Flying Spirit logic is needed to judge whether the matter is concealed, delayed, covered, or being activated behind the scenes.";
   }
 
+  plainMeaning = addCalendarMeaning(plainMeaning, calendarConfidence);
+
   return {
     result: finalJudgment,
     finalJudgment,
     confidence,
+    calendarConfidence,
     plainMeaning,
     reason: plainMeaning,
     risk:
@@ -656,8 +763,8 @@ function buildGenericRecommendation({
             "No major warning signs are visible in the current MVP layer, but deeper WWG rules still need confirmation.",
           ],
     action:
-      "Clarify the question, complete the calendar setup, and compare the matter line against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic.",
-    nextCheck: `Next check: compare the focus line against Shi/Ying, moving lines, transformed hexagram, and hidden/flying spirit logic. ${getMovingLineText(
+      "Clarify the question, complete the calendar setup, and compare the matter line against Shi/Ying, moving lines, transformed hexagram, hidden/flying spirit logic, and verified calendar timing.",
+    nextCheck: `Next check: compare the focus line against Shi/Ying, moving lines, transformed hexagram, hidden/flying spirit logic, and verified calendar timing. ${getMovingLineText(
       movingLines
     )}`,
   };
@@ -672,6 +779,7 @@ export function buildRecommendation({
   conflictReport = {},
   movingLines = [],
   clarityScore = 0,
+  calendarConfidence = null,
 }) {
   const normalizedFocus = String(selectedFocus || "").toLowerCase();
 
@@ -684,6 +792,7 @@ export function buildRecommendation({
       conflictReport,
       movingLines,
       clarityScore,
+      calendarConfidence,
     });
   }
 
@@ -696,6 +805,7 @@ export function buildRecommendation({
       conflictReport,
       movingLines,
       clarityScore,
+      calendarConfidence,
     });
   }
 
@@ -708,6 +818,7 @@ export function buildRecommendation({
       conflictReport,
       movingLines,
       clarityScore,
+      calendarConfidence,
     });
   }
 
@@ -720,6 +831,7 @@ export function buildRecommendation({
       conflictReport,
       movingLines,
       clarityScore,
+      calendarConfidence,
     });
   }
 
@@ -731,5 +843,6 @@ export function buildRecommendation({
     conflictReport,
     movingLines,
     clarityScore,
+    calendarConfidence,
   });
 }
