@@ -13,7 +13,7 @@ function formatCalendarSource(calendarSource, manualCalendarMode) {
     return "Manual calendar override";
   }
 
-  if (calendarSource === "automatic") {
+  if (calendarSource === "automatic" || calendarSource === "calculated") {
     return "Automatic calendar foundation";
   }
 
@@ -29,11 +29,37 @@ function formatCalendarStatus(calendarSource, manualCalendarMode) {
     return "Manual calendar override active";
   }
 
-  if (calendarSource === "automatic") {
+  if (calendarSource === "automatic" || calendarSource === "calculated") {
     return "Automatic calendar foundation active";
   }
 
   return "Using fallback placeholder values";
+}
+
+function formatCalendarConfidence(calendarConfidence) {
+  if (!calendarConfidence) {
+    return `Calendar Confidence: Not calculated
+Calendar Confidence Score: Not calculated
+Timing Reliability: Not calculated
+Calendar Confidence Note: Not calculated
+Calendar Confidence Warning: Not calculated`;
+  }
+
+  const timingReliability = calendarConfidence.isReliableForTiming
+    ? "Reliable enough for this MVP timing layer"
+    : "Not reliable for final timing judgment";
+
+  return `Calendar Confidence: ${formatValue(calendarConfidence.level)}
+Calendar Confidence Score: ${formatValue(
+    calendarConfidence.score,
+    "Not scored"
+  )}/100
+Timing Reliability: ${timingReliability}
+Calendar Confidence Note: ${formatValue(calendarConfidence.summary)}
+Calendar Confidence Warning: ${formatValue(
+    calendarConfidence.warning,
+    "No calendar warning."
+  )}`;
 }
 
 function formatBranch(branch) {
@@ -159,6 +185,7 @@ export function buildReadingSummary({
   location,
   dayChangeRule,
   calendarSource,
+  calendarConfidence,
   manualCalendarMode,
   manualMonthBranchData,
   manualDayBranchData,
@@ -227,6 +254,7 @@ Location / Timezone: ${formatValue(location)}
 Day Change Rule: ${formatValue(dayChangeRule, "23:00")}
 Calendar Source: ${calendarSourceLabel}
 Chinese Calendar Status: ${calendarStatusLabel}
+${formatCalendarConfidence(calendarConfidence)}
 ${
   manualCalendarMode
     ? `Manual Day Stem: ${manualDayStemLabel}
