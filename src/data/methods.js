@@ -1,3 +1,10 @@
+export const pendingMethod = {
+  id: "PENDING",
+  name: "Method Pending",
+  description:
+    "No WWG method has been selected yet. Enter or refine a question before choosing GLDM, TDM, RIDM, CDM, or ADM.",
+};
+
 export const methods = [
   {
     id: "GLDM",
@@ -31,7 +38,10 @@ export const methods = [
   },
 ];
 
+export const allMethods = [pendingMethod, ...methods];
+
 export const methodFocusMap = {
+  PENDING: "Method pending",
   GLDM: "Asset-line",
   TDM: "Moving line",
   RIDM: "Object-line",

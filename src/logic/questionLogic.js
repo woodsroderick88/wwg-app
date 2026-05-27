@@ -1,25 +1,158 @@
-import { methods } from "../data/methods";
+const METHOD_PENDING_ID = "PENDING";
+
+const METHOD_KEYWORDS = {
+  GLDM: [
+    "money",
+    "profit",
+    "income",
+    "revenue",
+    "sales",
+    "business",
+    "wealth",
+    "financial",
+    "paid",
+    "earn",
+    "app",
+    "product",
+    "launch",
+    "customer",
+    "client",
+    "roi",
+    "return",
+    "benefit",
+    "gain",
+    "loss",
+    "cost",
+    "value",
+    "resources",
+  ],
+  TDM: [
+    "when",
+    "timing",
+    "date",
+    "soon",
+    "delay",
+    "arrive",
+    "happen",
+    "finish",
+    "complete",
+    "receive",
+    "within",
+    "by",
+    "next",
+    "month",
+    "week",
+    "year",
+    "days",
+    "weeks",
+    "months",
+    "years",
+  ],
+  RIDM: [
+    "relationship",
+    "partner",
+    "marriage",
+    "wife",
+    "husband",
+    "girlfriend",
+    "boyfriend",
+    "friend",
+    "love",
+    "family",
+    "person",
+    "develop",
+    "response",
+    "contact",
+    "connection",
+    "health",
+    "recovery",
+    "job",
+    "career",
+  ],
+  CDM: [
+    "compete",
+    "competition",
+    "opponent",
+    "rival",
+    "win",
+    "lose",
+    "against",
+    "versus",
+    "vs",
+    "contest",
+    "conflict",
+    "fight",
+    "battle",
+    "compare",
+    "side",
+  ],
+  ADM: [
+    "housing",
+    "apartment",
+    "government apartment",
+    "government housing",
+    "public housing",
+    "section 8",
+    "voucher",
+    "shelter",
+    "home",
+    "house",
+    "lease",
+    "rental",
+    "rent",
+    "landlord",
+    "tenant",
+    "application",
+    "approval",
+    "approved",
+    "document",
+    "paperwork",
+    "contract",
+    "legal",
+    "safe",
+    "safety",
+    "support",
+    "protection",
+    "property",
+  ],
+};
+
+function clean(value) {
+  return String(value || "").trim();
+}
+
+function lower(value) {
+  return clean(value).toLowerCase();
+}
+
+function scoreMethod(text, methodId) {
+  const keywords = METHOD_KEYWORDS[methodId] || [];
+
+  return keywords.reduce((total, keyword) => {
+    return text.includes(keyword.toLowerCase()) ? total + 1 : total;
+  }, 0);
+}
 
 export function recommendMethod(question) {
-  const text = question.toLowerCase();
+  const text = lower(question);
 
-  if (!text.trim()) return "GLDM";
+  if (!text) {
+    return METHOD_PENDING_ID;
+  }
 
-  const scores = methods.map((method) => ({
-    id: method.id,
-    score: method.keywords.reduce((total, keyword) => {
-      return text.includes(keyword) ? total + 1 : total;
-    }, 0),
+  const scores = Object.keys(METHOD_KEYWORDS).map((methodId) => ({
+    id: methodId,
+    score: scoreMethod(text, methodId),
   }));
 
   const best = scores.sort((a, b) => b.score - a.score)[0];
 
-  return best.score > 0 ? best.id : "GLDM";
+  return best && best.score > 0 ? best.id : "GLDM";
 }
 
 function hasMultipleQuestionSignals(question) {
-  const lower = question.toLowerCase();
-  const questionMarks = (question.match(/\?/g) || []).length;
+  const text = lower(question);
+  const questionMarks = (clean(question).match(/\?/g) || []).length;
 
   if (questionMarks > 1) return true;
 
@@ -32,11 +165,11 @@ function hasMultipleQuestionSignals(question) {
     " another question",
   ];
 
-  return splitSignals.some((signal) => lower.includes(signal));
+  return splitSignals.some((signal) => text.includes(signal));
 }
 
 function hasClearOutcome(question) {
-  const lower = question.toLowerCase();
+  const text = lower(question);
 
   const outcomeSignals = [
     "will i",
@@ -58,9 +191,14 @@ function hasClearOutcome(question) {
     "win",
     "safe",
     "suitable",
+    "approved",
+    "receive",
+    "complete",
+    "make money",
+    "generate",
   ];
 
-  return outcomeSignals.some((signal) => lower.includes(signal));
+  return outcomeSignals.some((signal) => text.includes(signal));
 }
 
 export function getQuestionWarnings(
@@ -72,7 +210,7 @@ export function getQuestionWarnings(
   castingTime
 ) {
   const warnings = [];
-  const cleanQuestion = question.trim();
+  const cleanQuestion = clean(question);
 
   if (!cleanQuestion) {
     warnings.push("Enter a clear question before casting.");
@@ -92,25 +230,25 @@ export function getQuestionWarnings(
     );
   }
 
-  if (!selfRole.trim()) {
+  if (!clean(selfRole)) {
     warnings.push("Define what Self represents.");
   }
 
-  if (!objectRole.trim()) {
+  if (!clean(objectRole)) {
     warnings.push(
       "Define what Object represents, even if the method later does not use it."
     );
   }
 
-  if (!timeframe.trim()) {
+  if (!clean(timeframe)) {
     warnings.push("Add a timeframe so the reading has a clear validity period.");
   }
 
-  if (!castingDate) {
+  if (!clean(castingDate)) {
     warnings.push("Add the casting date for the calendar engine.");
   }
 
-  if (!castingTime) {
+  if (!clean(castingTime)) {
     warnings.push("Add the casting time for the calendar engine.");
   }
 
