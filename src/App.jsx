@@ -1,7 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 
-import { methods, methodFocusMap } from "./data/methods";
+import {
+  allMethods,
+  methods,
+  methodFocusMap,
+  pendingMethod,
+} from "./data/methods";
 import { focusOptions } from "./data/focusOptions";
 import { lineTypes, defaultLines } from "./data/lines";
 import {
@@ -43,6 +48,16 @@ import { buildConflictReport } from "./logic/conflictLogic";
 import { buildRecommendation } from "./logic/recommendationLogic";
 import { buildManualHexagramEntry } from "./logic/manualHexagramEntryLogic";
 import {
+  buildPendingMethodState,
+  getMethodPendingId,
+  hasQuestionInput,
+} from "./logic/methodStateLogic";
+import {
+  buildDraftFinalQuestion,
+  formatDraftQuestionLabel,
+  getDraftQuestionSourceNote,
+} from "./logic/questionDraftLogic";
+import {
   buildSnapshotsExportJson,
   clearSavedSnapshots,
   createSnapshot,
@@ -61,7 +76,9 @@ import {
   buildSnapshotCompareText,
 } from "./logic/snapshotCompareLogic";
 
+const METHOD_PENDING_ID = getMethodPendingId();
 const VALID_METHOD_IDS = ["GLDM", "TDM", "RIDM", "CDM", "ADM"];
+const SELECTABLE_METHOD_IDS = VALID_METHOD_IDS;
 
 function renderLineByValue(value) {
   if (value === "yang") {
@@ -159,6 +176,15 @@ function getLineLabel(lineKey) {
   return lineTypes[lineKey]?.label || "Unknown line";
 }
 
+function getMethodDisplayName(methodId) {
+  const method = allMethods.find((item) => item.id === methodId);
+  return method ? `${method.id} — ${method.name}` : "Method pending";
+}
+
+function normalizeMethodForSave(methodId) {
+  return SELECTABLE_METHOD_IDS.includes(methodId) ? methodId : METHOD_PENDING_ID;
+}
+
 function buildManualHexagramExportSummary({
   manualHexagramNumber,
   manualHexagramMovingLines,
@@ -227,7 +253,7 @@ function buildSnapshotDetailsText(snapshot) {
 CORE QUESTION
 Saved title: ${snapshot.title || "Untitled reading"}
 Question: ${snapshot.question || "Not set"}
-Method: ${snapshot.selectedMethod || "Not set"}
+Method: ${getMethodDisplayName(snapshot.selectedMethod)}
 Self: ${snapshot.selfRole || "Not set"}
 Object: ${snapshot.objectRole || "Not set"}
 Timeframe: ${snapshot.timeframe || "Not set"}
@@ -285,7 +311,6 @@ function DetailSection({ title, children }) {
     </div>
   );
 }
-
 function DetailRow({ label, value }) {
   return (
     <div
@@ -381,6 +406,39 @@ function CalendarConfidenceCard({ calendarConfidence }) {
   );
 }
 
+function MethodPendingCard({ methodState }) {
+  if (!methodState?.pending) {
+    return null;
+  }
+
+  return (
+    <div className="recommendation-card">
+      <strong>Method Status</strong>
+      <p>{methodState.label}</p>
+      <p>{methodState.summary}</p>
+      {methodState.warning ? (
+        <p>
+          <strong>Warning:</strong> {methodState.warning}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function DraftQuestionCard({ draftQuestionState }) {
+  if (!draftQuestionState?.question || !draftQuestionState.isDraft) {
+    return null;
+  }
+
+  return (
+    <div className="recommendation-card">
+      <strong>Draft Question Active</strong>
+      <p>{formatDraftQuestionLabel(draftQuestionState)}</p>
+      <p>{getDraftQuestionSourceNote(draftQuestionState)}</p>
+    </div>
+  );
+}
+
 function App() {
   const [rawQuestion, setRawQuestion] = useState("");
   const [clarifiedIntent, setClarifiedIntent] = useState("");
@@ -390,7 +448,7 @@ function App() {
   const [selectedQuestionIntent, setSelectedQuestionIntent] = useState("");
 
   const [question, setQuestion] = useState("");
-  const [selectedMethod, setSelectedMethod] = useState("GLDM");
+  const [selectedMethod, setSelectedMethod] = useState(METHOD_PENDING_ID);
   const [selfRole, setSelfRole] = useState("");
   const [objectRole, setObjectRole] = useState("");
   const [timeframe, setTimeframe] = useState("");
@@ -398,8 +456,9 @@ function App() {
   const [lines, setLines] = useState(defaultLines);
   const [lineBranches, setLineBranches] = useState(defaultLineBranches);
   const [coinCastingHistory, setCoinCastingHistory] = useState([]);
-    const [manualHexagramNumber, setManualHexagramNumber] = useState("");
-  const [manualHexagramMovingLines, setManualHexagramMovingLines] = useState("");
+  const [manualHexagramNumber, setManualHexagramNumber] = useState("");
+  const [manualHexagramMovingLines, setManualHexagramMovingLines] =
+    useState("");
   const [manualHexagramStatus, setManualHexagramStatus] = useState("");
 
   const [castingDate, setCastingDate] = useState("");
@@ -476,55 +535,107 @@ function App() {
     ]
   );
 
+  const draftQuestionState = buildDraftFinalQuestion({
+    finalCastingQuestion: question,
+    rawQuestion,
+    suggestedFinalQuestion: questionRefinement.suggestedFinalQuestion,
+  });
+
+  const effectiveQuestion = draftQuestionState.question;
+
+  const hasAnyQuestionInput = hasQuestionInput({
+    rawQuestion,
+    finalCastingQuestion: effectiveQuestion,
+    clarifiedIntent,
+  });
+
+  const questionForLogic = effectiveQuestion || clarifiedIntent;
+
+  const fallbackRecommendedMethodId = useMemo(() => {
+    if (!hasAnyQuestionInput) {
+      return METHOD_PENDING_ID;
+    }
+
+    return recommendMethod(questionForLogic);
+  }, [hasAnyQuestionInput, questionForLogic]);
+
+  const recommendedMethodId = hasAnyQuestionInput
+    ? VALID_METHOD_IDS.includes(questionRefinement.methodHints?.[0])
+      ? questionRefinement.methodHints[0]
+      : fallbackRecommendedMethodId
+    : METHOD_PENDING_ID;
+
   useEffect(() => {
     const methodHint = questionRefinement.methodHints?.[0];
 
-    if (VALID_METHOD_IDS.includes(methodHint) && selectedMethod !== methodHint) {
+    if (
+      hasAnyQuestionInput &&
+      VALID_METHOD_IDS.includes(methodHint) &&
+      selectedMethod !== methodHint
+    ) {
       setSelectedMethod(methodHint);
       setManualFocus("");
       setCopied(false);
       setSnapshotStatus(`Method auto-synced to ${methodHint}.`);
       setDeleteConfirmArmed(false);
+      return;
     }
-  }, [questionRefinement.methodHints, selectedMethod]);
 
-  const questionForLogic = question || rawQuestion;
+    if (!hasAnyQuestionInput && selectedMethod !== METHOD_PENDING_ID) {
+      setSelectedMethod(METHOD_PENDING_ID);
+      setManualFocus("");
+      setCopied(false);
+      setSnapshotStatus("");
+      setDeleteConfirmArmed(false);
+    }
+  }, [hasAnyQuestionInput, questionRefinement.methodHints, selectedMethod]);
 
-  const fallbackRecommendedMethodId = useMemo(
-    () => recommendMethod(questionForLogic),
-    [questionForLogic]
-  );
+  const methodState = buildPendingMethodState({
+    rawQuestion,
+    finalCastingQuestion: effectiveQuestion,
+    clarifiedIntent,
+    selectedMethod,
+    recommendedMethodId,
+  });
 
-  const recommendedMethodId = VALID_METHOD_IDS.includes(
-    questionRefinement.methodHints?.[0]
-  )
-    ? questionRefinement.methodHints[0]
-    : fallbackRecommendedMethodId;
+  const recommendedMethod = methodState.pending
+    ? pendingMethod
+    : allMethods.find((item) => item.id === recommendedMethodId) ||
+      pendingMethod;
 
-  const recommendedMethod = methods.find(
-    (item) => item.id === recommendedMethodId
-  );
+  const effectiveMethodId = methodState.pending
+    ? METHOD_PENDING_ID
+    : selectedMethod;
 
-  const method = methods.find((item) => item.id === selectedMethod);
+  const method = methodState.pending
+    ? pendingMethod
+    : methods.find((item) => item.id === selectedMethod) || pendingMethod;
 
-  const recommendedFocus = methodFocusMap[selectedMethod];
+  const recommendedFocus = methodFocusMap[effectiveMethodId] || "Method pending";
 
   const refinementFocusHint = questionRefinement.focusHints?.[0];
 
   const intentFocus =
+    !methodState.pending &&
     refinementFocusHint &&
     refinementFocusHint !== "Using recommended focus" &&
     focusOptions.some((focus) => focus.key === refinementFocusHint)
       ? refinementFocusHint
       : "";
 
-  const selectedFocus = manualFocus || intentFocus || recommendedFocus;
+  const selectedFocus = methodState.pending
+    ? "Method pending"
+    : manualFocus || intentFocus || recommendedFocus;
 
-  const selectedFocusInfo = focusOptions.find(
-    (focus) => focus.key === selectedFocus
-  );
-
-  const calendarContext = buildCalendarContext({
+  const selectedFocusInfo = methodState.pending
+    ? {
+        key: "Method pending",
+        label: "Method pending",
+        meaning:
+          "No useful-spirit focus has been selected yet because the question method is pending.",
+      }
+    : focusOptions.find((focus) => focus.key === selectedFocus);
+      const calendarContext = buildCalendarContext({
     castingDate,
     castingTime,
     dayChangeRule,
@@ -574,7 +685,7 @@ function App() {
   });
 
   const warnings = getQuestionWarnings(
-    question,
+    effectiveQuestion,
     selfRole,
     objectRole,
     timeframe,
@@ -582,8 +693,18 @@ function App() {
     castingTime
   );
 
+  if (draftQuestionState.isDraft && effectiveQuestion) {
+    warnings.push(
+      "Final casting question is using a draft source. Apply the suggested question or enter a final casting question before relying on the reading."
+    );
+  }
+
   if (!questionRefinement.readyToCast) {
     warnings.push(`Question Refinement: ${questionRefinement.readinessLabel}.`);
+  }
+
+  if (methodState.pending) {
+    warnings.push("Select or refine a method before relying on the reading.");
   }
 
   if (manualCalendarMode) {
@@ -645,228 +766,236 @@ function App() {
     };
   });
 
-  const focusRows = sixKinRows.filter((row) =>
-    isFocusMatch(row, selectedFocus)
-  );
+  const focusRows = methodState.pending
+    ? []
+    : sixKinRows.filter((row) => isFocusMatch(row, selectedFocus));
 
-  const focusSummary = getFocusSummary(selectedFocus, focusRows);
+  const focusSummary = methodState.pending
+    ? "No focus reading yet. Enter or refine a question before selecting a WWG method and useful spirit."
+    : getFocusSummary(selectedFocus, focusRows);
 
-  const ruleGraph = buildRuleGraph({
-    selectedMethod,
-    method,
-    selectedFocus,
-    selectedFocusInfo,
-    focusRows,
-    originalHexagram,
-    transformedHexagram,
-    monthBranch,
-    dayBranch,
-    voidPair,
-    movingLines,
-  });
-
-  const conflictReport = buildConflictReport({
-    selectedMethod,
-    selectedFocus,
-    focusRows,
-    movingLines,
-    clarityScore,
-  });
-
-  const recommendation = buildRecommendation({
-    selectedMethod,
-    selectedFocus,
-    focusRows,
-    focusSummary,
-    ruleConclusion: ruleGraph.conclusion,
-    conflictReport,
-    movingLines,
-    clarityScore,
-    calendarConfidence,
-  });
-
-  const palaceRules = buildPalaceRulesPreview({
-    originalHexagram,
-    transformedHexagram,
-    sixKinRows,
-    selectedFocus,
-    focusRows,
-    movingLines,
-  });
-
-  const hiddenSpirit = buildHiddenSpiritPreview({
-    selectedFocus,
-    focusRows,
-    sixKinRows,
-    palaceRules,
-    movingLines,
-  });
-
-  const castingModeSummary = useMemo(() => {
-    if (coinCastingHistory.length > 0) {
-      return buildCoinCastingSummary(coinCastingHistory);
-    }
-
-    if (manualHexagramStatus) {
-      return buildManualHexagramExportSummary({
-        manualHexagramNumber,
-        manualHexagramMovingLines,
-        lines,
+  const ruleGraph = methodState.pending
+    ? {
+        rules: [
+          {
+            title: "Method pending",
+            text: "No WWG method has been selected yet because the question is not ready for reliable coding.",
+          },
+          {
+            title: "Next required step",
+            text: "Enter a raw question, clarify the intent, define Self/Object, and set a timeframe before treating the chart as a coded reading.",
+          },
+        ],
+        conclusion:
+          "Method is pending. The chart can be visually prepared, but no final WWG rule conclusion should be trusted yet.",
+      }
+    : buildRuleGraph({
+        selectedMethod: effectiveMethodId,
+        method,
+        selectedFocus,
+        selectedFocusInfo,
+        focusRows,
         originalHexagram,
         transformedHexagram,
+        monthBranch,
+        dayBranch,
+        voidPair,
         movingLines,
       });
-    }
 
-    return buildCoinCastingSummary([]);
-  }, [
-    coinCastingHistory,
-    manualHexagramStatus,
+  const conflictReport = buildConflictReport({
+    warnings,
+    focusRows,
+    movingLines,
+    clarityScore,
+  });
+
+  const recommendation = methodState.pending
+    ? {
+        result: "Method pending",
+        finalJudgment: "Method pending",
+        confidence: "Low",
+        calendarConfidence,
+        plainMeaning:
+          "No final reading should be made yet because the method is pending. Enter or refine the question first so the app can select the correct WWG method and useful spirit.",
+        reason:
+          "No final reading should be made yet because the method is pending. Enter or refine the question first so the app can select the correct WWG method and useful spirit.",
+        risk:
+          "Warning signs: A blank or unclear question can make GLDM appear as a false default. The app is now holding the method in a pending state until there is enough question context.",
+        supportingSigns: [
+          "The app is preventing a false GLDM default when the question is empty or not ready.",
+        ],
+        warningSigns: [
+          "The question setup is not clear enough for method selection.",
+          "Do not treat the current chart as a final coded WWG reading yet.",
+        ],
+        action:
+          "Enter a clear final casting question, define Self/Object, and add a timeframe. Then use the suggested method or choose the method manually.",
+        nextCheck:
+          "Next check: once the question is clear, confirm method, useful spirit, calendar confidence, moving lines, Shi/Ying, and hidden/flying spirit logic.",
+      }
+    : buildRecommendation({
+        selectedMethod: effectiveMethodId,
+        selectedFocus,
+        focusRows,
+        focusSummary,
+        ruleConclusion: ruleGraph.conclusion,
+        movingLines,
+        clarityScore,
+        calendarConfidence,
+      });
+
+  const palaceRules = methodState.pending
+    ? {
+        summary:
+          "Palace rules are waiting for a selected method and useful-spirit focus.",
+        notes: [
+          {
+            title: "Method pending",
+            text: "Palace rules can display chart structure later, but interpretation should wait until a method is selected.",
+          },
+        ],
+      }
+    : buildPalaceRulesPreview({
+        originalHexagram,
+        transformedHexagram,
+        selectedFocus,
+        focusRows,
+        sixKinRows,
+        movingLines,
+      });
+
+  const hiddenSpirit = methodState.pending
+    ? {
+        status: "Method pending",
+        flyingStatus: "Method pending",
+        selectedFocus,
+        visibleFocusFound: false,
+        notes: [
+          {
+            title: "Method pending",
+            text: "Hidden/Flying Spirit interpretation is paused until the app knows which useful spirit is being judged.",
+          },
+        ],
+        summary:
+          "Hidden/Flying Spirit preview is waiting for method and useful-spirit selection.",
+      }
+    : buildHiddenSpiritPreview({
+        originalHexagram,
+        transformedHexagram,
+        selectedFocus,
+        focusRows,
+        sixKinRows,
+        movingLines,
+        palaceRules,
+      });
+        const questionRefinementSummary = buildQuestionRefinementSummary(
+    questionRefinement
+  );
+
+  const coinCastingSummary = buildCoinCastingSummary(coinCastingHistory);
+
+  const manualHexagramSummary = buildManualHexagramExportSummary({
     manualHexagramNumber,
     manualHexagramMovingLines,
     lines,
     originalHexagram,
     transformedHexagram,
     movingLines,
-  ]);
+  });
+
+  const readingSummaryCore = buildReadingSummary({
+    question: effectiveQuestion,
+    selectedMethod: effectiveMethodId,
+    method,
+    selfRole,
+    objectRole,
+    timeframe,
+    clarityScore,
+
+    castingDate,
+    castingTime,
+    location,
+    dayChangeRule,
+    calendarSource,
+    calendarConfidence,
+    manualCalendarMode,
+    manualMonthBranchData,
+    manualDayBranchData,
+    manualDayStemData,
+    manualDayVoidData,
+    monthBranch,
+    dayBranch,
+    voidPair,
+
+    originalHexagram,
+    transformedHexagram,
+    movingLines,
+    sixKinRows,
+
+    selectedFocus,
+    selectedFocusInfo,
+    focusRows,
+    focusSummary,
+
+    ruleGraph,
+    conflictReport,
+    recommendation,
+    palaceRules,
+    hiddenSpirit,
+  });
+
+  const draftQuestionExportNote =
+    draftQuestionState.isDraft && draftQuestionState.question
+      ? `
+
+DRAFT QUESTION SOURCE
+${draftQuestionState.label}: ${draftQuestionState.question}
+Note: ${draftQuestionState.note}`
+      : "";
+
+  const readingSummary = `${questionRefinementSummary}${draftQuestionExportNote}
+
+${coinCastingHistory.length ? coinCastingSummary : manualHexagramSummary}
+
+${readingSummaryCore}`;
 
   const visibleSnapshots = useMemo(() => {
-    const cleanSearch = snapshotSearch.trim().toLowerCase();
+    const searchText = snapshotSearch.trim().toLowerCase();
 
-    const filteredSnapshots = cleanSearch
+    const filteredSnapshots = searchText
       ? savedSnapshots.filter((snapshot) =>
-          buildSnapshotSearchText(snapshot).includes(cleanSearch)
+          buildSnapshotSearchText(snapshot).includes(searchText)
         )
       : savedSnapshots;
 
     return sortSnapshots(filteredSnapshots, snapshotSort);
   }, [savedSnapshots, snapshotSearch, snapshotSort]);
 
-  const compareSnapshotA = useMemo(
-    () =>
-      savedSnapshots.find((snapshot) => snapshot.id === compareSnapshotAId) ||
-      null,
-    [savedSnapshots, compareSnapshotAId]
+  const compareSnapshotA = savedSnapshots.find(
+    (snapshot) => snapshot.id === compareSnapshotAId
   );
 
-  const compareSnapshotB = useMemo(
-    () =>
-      savedSnapshots.find((snapshot) => snapshot.id === compareSnapshotBId) ||
-      null,
-    [savedSnapshots, compareSnapshotBId]
+  const compareSnapshotB = savedSnapshots.find(
+    (snapshot) => snapshot.id === compareSnapshotBId
   );
+
+  const canCompareSnapshots = Boolean(compareSnapshotA && compareSnapshotB);
 
   const compareSameReading =
     compareSnapshotAId &&
     compareSnapshotBId &&
     compareSnapshotAId === compareSnapshotBId;
 
-  const canCompareSnapshots =
-    Boolean(compareSnapshotA) && Boolean(compareSnapshotB) && !compareSameReading;
+  const compareRows =
+    canCompareSnapshots && !compareSameReading
+      ? buildSnapshotCompareRows(compareSnapshotA, compareSnapshotB)
+      : [];
 
-  const compareRows = useMemo(
-    () =>
-      canCompareSnapshots
-        ? buildSnapshotCompareRows(compareSnapshotA, compareSnapshotB)
-        : [],
-    [compareSnapshotA, compareSnapshotB, canCompareSnapshots]
-  );
-
-  const compareSummary = useMemo(
-    () =>
-      canCompareSnapshots
-        ? buildSnapshotCompareSummary(compareSnapshotA, compareSnapshotB)
-        : null,
-    [compareSnapshotA, compareSnapshotB, canCompareSnapshots]
-  );
-
-  const baseReadingSummary = useMemo(
-    () =>
-      buildReadingSummary({
-        question,
-        selectedMethod,
-        method,
-        selfRole,
-        objectRole,
-        timeframe,
-        clarityScore,
-
-        castingDate,
-        castingTime,
-        location,
-        dayChangeRule,
-        calendarSource,
-        calendarConfidence,
-        manualCalendarMode,
-        manualMonthBranchData,
-        manualDayBranchData,
-        manualDayStemData,
-        manualDayVoidData,
-        monthBranch,
-        dayBranch,
-        voidPair,
-
-        originalHexagram,
-        transformedHexagram,
-        movingLines,
-        sixKinRows,
-
-        selectedFocus,
-        selectedFocusInfo,
-        focusRows,
-        focusSummary,
-
-        ruleGraph,
-        conflictReport,
-        recommendation,
-        palaceRules,
-        hiddenSpirit,
-      }),
-    [
-      question,
-      selectedMethod,
-      method,
-      selfRole,
-      objectRole,
-      timeframe,
-      clarityScore,
-      castingDate,
-      castingTime,
-      location,
-      dayChangeRule,
-      calendarSource,
-      calendarConfidence,
-      manualCalendarMode,
-      manualMonthBranchData,
-      manualDayBranchData,
-      manualDayStemData,
-      manualDayVoidData,
-      monthBranch,
-      dayBranch,
-      voidPair,
-      originalHexagram,
-      transformedHexagram,
-      movingLines,
-      sixKinRows,
-      selectedFocus,
-      selectedFocusInfo,
-      focusRows,
-      focusSummary,
-      ruleGraph,
-      conflictReport,
-      recommendation,
-      palaceRules,
-      hiddenSpirit,
-    ]
-  );
-
-  const readingSummary = useMemo(
-    () =>
-      `${buildQuestionRefinementSummary(
-        questionRefinement
-      )}\n\n${castingModeSummary}\n\n${baseReadingSummary}`,
-    [questionRefinement, castingModeSummary, baseReadingSummary]
-  );
+  const compareSummary =
+    canCompareSnapshots && !compareSameReading
+      ? buildSnapshotCompareSummary(compareSnapshotA, compareSnapshotB)
+      : null;
 
   function updateLine(index, value) {
     setLines((currentLines) =>
@@ -914,7 +1043,8 @@ function App() {
     setEmotionalTone("");
     setSelectedQuestionIntent("");
   }
-    function resetCurrentReading() {
+
+  function resetCurrentReading() {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
     setManualHexagramNumber("");
@@ -951,6 +1081,7 @@ function App() {
       setSnapshotStatus,
     });
 
+    setSelectedMethod(METHOD_PENDING_ID);
     setDeleteConfirmArmed(false);
     clearSnapshotEditModes();
     scrollToQuestionSection();
@@ -997,6 +1128,10 @@ function App() {
     setClarifiedIntent(preset.description || "");
     setSelectedQuestionIntent("");
 
+    if (!VALID_METHOD_IDS.includes(preset.selectedMethod)) {
+      setSelectedMethod("GLDM");
+    }
+
     setDeleteConfirmArmed(false);
     clearSnapshotEditModes();
     scrollToQuestionSection();
@@ -1028,6 +1163,14 @@ function App() {
   function castReadingWithCoins() {
     const methodHint = questionRefinement.methodHints?.[0];
 
+    if (!hasAnyQuestionInput) {
+      setSnapshotStatus(
+        "Enter or refine a question before casting so the method is not pending."
+      );
+      setDeleteConfirmArmed(false);
+      return;
+    }
+
     if (VALID_METHOD_IDS.includes(methodHint) && selectedMethod !== methodHint) {
       setSelectedMethod(methodHint);
       setManualFocus("");
@@ -1047,8 +1190,7 @@ function App() {
     setDeleteConfirmArmed(false);
     clearSnapshotEditModes();
   }
-
-  function applyManualHexagramEntry() {
+    function applyManualHexagramEntry() {
     const result = buildManualHexagramEntry({
       originalHexagramNumber: manualHexagramNumber,
       movingLinesText: manualHexagramMovingLines,
@@ -1119,15 +1261,23 @@ function App() {
   }
 
   function saveCurrentSnapshot() {
-    if (!question.trim()) {
-      setSnapshotStatus("Add a final casting question before saving a reading.");
+    if (!effectiveQuestion.trim()) {
+      setSnapshotStatus("Add a question before saving a reading.");
+      setDeleteConfirmArmed(false);
+      return;
+    }
+
+    if (methodState.pending) {
+      setSnapshotStatus(
+        "Method is pending. Refine the question or choose a method before saving."
+      );
       setDeleteConfirmArmed(false);
       return;
     }
 
     const snapshot = createSnapshot({
-      question,
-      selectedMethod,
+      question: effectiveQuestion,
+      selectedMethod: normalizeMethodForSave(effectiveMethodId),
       selfRole,
       objectRole,
       timeframe,
@@ -1165,6 +1315,8 @@ function App() {
     setSnapshotStatus(
       action === "updated"
         ? "Updated existing saved reading."
+        : draftQuestionState.isDraft
+        ? "Saved current reading using draft question."
         : "Saved current reading."
     );
 
@@ -1173,6 +1325,9 @@ function App() {
 
   function loadSnapshot(snapshot) {
     const loadedQuestion = snapshot.question || "";
+    const loadedMethod = VALID_METHOD_IDS.includes(snapshot.selectedMethod)
+      ? snapshot.selectedMethod
+      : METHOD_PENDING_ID;
 
     setRawQuestion(loadedQuestion);
     setClarifiedIntent("");
@@ -1186,7 +1341,7 @@ function App() {
     setManualHexagramStatus("");
 
     setQuestion(loadedQuestion);
-    setSelectedMethod(snapshot.selectedMethod || "GLDM");
+    setSelectedMethod(loadedQuestion.trim() ? loadedMethod : METHOD_PENDING_ID);
     setSelfRole(snapshot.selfRole || "");
     setObjectRole(snapshot.objectRole || "");
     setTimeframe(snapshot.timeframe || "");
@@ -1296,8 +1451,7 @@ function App() {
     setSnapshotStatus("Renamed saved reading.");
     setDeleteConfirmArmed(false);
   }
-
-  function startEditSnapshotNote(snapshot) {
+    function startEditSnapshotNote(snapshot) {
     setEditingNoteSnapshotId(snapshot.id);
     setNoteDraft(snapshot.note || "");
     setRenamingSnapshotId("");
@@ -1339,7 +1493,8 @@ function App() {
     setSnapshotStatus("");
     setDeleteConfirmArmed(false);
   }
-    function exportSavedSnapshots() {
+
+  function exportSavedSnapshots() {
     if (savedSnapshots.length === 0) {
       setSnapshotStatus("No saved readings to export.");
       setDeleteConfirmArmed(false);
@@ -1535,8 +1690,7 @@ function App() {
             </select>
           </label>
         </div>
-
-        <div className="field-grid">
+                <div className="field-grid">
           <label>
             Known facts
             <textarea
@@ -1621,6 +1775,13 @@ function App() {
           Use Suggested Final Question
         </button>
 
+        {draftQuestionState.isDraft && draftQuestionState.question && (
+          <div className="recommendation-box">
+            <strong>Draft final question in use:</strong>{" "}
+            {formatDraftQuestionLabel(draftQuestionState)}
+          </div>
+        )}
+
         <div className="score-row">
           <span>Question Quality</span>
           <strong>
@@ -1638,7 +1799,9 @@ function App() {
           <div className="recommendation-card">
             <strong>Method Hint</strong>
             <p>
-              {questionRefinement.methodHints.length
+              {methodState.pending
+                ? "Method pending"
+                : questionRefinement.methodHints.length
                 ? questionRefinement.methodHints.join(", ")
                 : "No method hint"}
             </p>
@@ -1647,7 +1810,9 @@ function App() {
           <div className="recommendation-card">
             <strong>Focus Hint</strong>
             <p>
-              {questionRefinement.focusHints.length
+              {methodState.pending
+                ? "Method pending"
+                : questionRefinement.focusHints.length
                 ? questionRefinement.focusHints.join(", ")
                 : "No focus hint"}
             </p>
@@ -1655,12 +1820,26 @@ function App() {
 
           <div className="recommendation-card">
             <strong>Ready to Cast</strong>
-            <p>{questionRefinement.readyToCast ? "Yes" : "No"}</p>
+            <p>{questionRefinement.readyToCast && !methodState.pending ? "Yes" : "No"}</p>
           </div>
+
+          <MethodPendingCard methodState={methodState} />
+          <DraftQuestionCard draftQuestionState={draftQuestionState} />
         </div>
 
-        {questionRefinement.warnings.length > 0 ? (
+        {questionRefinement.warnings.length > 0 || methodState.pending ? (
           <ul className="warning-list">
+            {methodState.pending && (
+              <li>
+                Method is pending until a question gives the app enough context.
+              </li>
+            )}
+            {draftQuestionState.isDraft && draftQuestionState.question && (
+              <li>
+                Raw question is being used as a draft final question until you
+                apply or enter a final casting question.
+              </li>
+            )}
             {questionRefinement.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
@@ -1672,12 +1851,14 @@ function App() {
         )}
       </section>
 
-            <section className="panel">
+      <section className="panel">
         <h2>2. Choose the reading method</h2>
 
         <div className="recommendation-box">
-          <strong>Recommended method:</strong> {recommendedMethod.id} —{" "}
-          {recommendedMethod.name}
+          <strong>Recommended method:</strong>{" "}
+          {methodState.pending
+            ? "Method pending — enter or refine a question first"
+            : `${recommendedMethod.id} — ${recommendedMethod.name}`}
         </div>
 
         <div className="method-grid">
@@ -1698,6 +1879,14 @@ function App() {
             </button>
           ))}
         </div>
+
+        {methodState.pending && (
+          <p className="section-note">
+            Manual method buttons remain available, but the app will not treat
+            GLDM as a true default recommendation while the question is blank or
+            unclear.
+          </p>
+        )}
       </section>
 
       <section className="panel">
@@ -1706,7 +1895,17 @@ function App() {
         <div className="summary-card">
           <p>
             <strong>Final casting question:</strong>{" "}
-            {question.trim() ? question : "No final question entered yet."}
+            {effectiveQuestion
+              ? formatDraftQuestionLabel(draftQuestionState)
+              : "No final question entered yet."}
+          </p>
+          <p>
+            <strong>Question source:</strong>{" "}
+            {getDraftQuestionSourceNote(draftQuestionState)}
+          </p>
+          <p>
+            <strong>Selected method:</strong>{" "}
+            {methodState.pending ? "Method pending" : method.name}
           </p>
           <p>
             <strong>Self:</strong> {selfRole.trim() ? selfRole : "Not set yet."}
@@ -1725,8 +1924,7 @@ function App() {
           </p>
         </div>
       </section>
-
-      <section className="panel">
+            <section className="panel">
         <h2>4. Calendar Engine Setup</h2>
         <p className="section-note">
           WWG depends on Gregorian date and time converted into Chinese
@@ -1953,7 +2151,8 @@ function App() {
           </p>
         )}
       </section>
-            <section className="panel">
+
+      <section className="panel">
         <h2>6. Line Entry / Chart Builder</h2>
         <p className="section-note">
           Cast six lines automatically with the three-coin method, manually
@@ -1969,6 +2168,13 @@ function App() {
             ? "Manual Hexagram Entry"
             : "Manual Line Entry"}
         </div>
+
+        {methodState.pending && (
+          <div className="recommendation-box">
+            <strong>Method pending:</strong> enter or refine a question before
+            casting if you want this chart to become a coded WWG reading.
+          </div>
+        )}
 
         <button className="export-button" onClick={castReadingWithCoins}>
           Cast Reading with Three Coins
@@ -2033,8 +2239,7 @@ function App() {
             </pre>
           )}
         </div>
-
-        {coinCastingHistory.length > 0 && (
+                {coinCastingHistory.length > 0 && (
           <div className="rule-list">
             {coinCastingHistory.map((result) => (
               <div key={result.lineNumber} className="rule-card">
@@ -2163,7 +2368,14 @@ function App() {
           <div className="field-grid">
             <label>
               Recommended focus
-              <input value={`${selectedFocus} from ${selectedMethod}`} readOnly />
+              <input
+                value={
+                  methodState.pending
+                    ? "Method pending"
+                    : `${selectedFocus} from ${effectiveMethodId}`
+                }
+                readOnly
+              />
             </label>
 
             <label>
@@ -2174,6 +2386,7 @@ function App() {
                   setManualFocus(event.target.value);
                   resetCopyAndStatus();
                 }}
+                disabled={methodState.pending}
               >
                 <option value="">Use recommended focus</option>
                 {focusOptions.map((focus) => (
@@ -2196,6 +2409,8 @@ function App() {
               <strong>Focus lines:</strong>{" "}
               {focusRows.length
                 ? focusRows.map((row) => `Line ${row.lineNumber}`).join(", ")
+                : methodState.pending
+                ? "Pending method selection"
                 : "None found"}
             </p>
             <p>
@@ -2203,7 +2418,8 @@ function App() {
             </p>
           </div>
         </div>
-                <div className="six-kins-panel">
+
+        <div className="six-kins-panel">
           <h3>Earthly Branch + Six-Kins Assignment</h3>
 
           <div className="field-grid">
@@ -2261,8 +2477,7 @@ function App() {
               </select>
             </label>
           </div>
-
-          <div className="six-kins-summary">
+                    <div className="six-kins-summary">
             <p>
               <strong>Using original hexagram element:</strong>{" "}
               {originalHexagram.palace.element}
@@ -2277,7 +2492,8 @@ function App() {
 
           <div className="six-kins-grid">
             {sixKinRows.map((row, index) => {
-              const focused = isFocusMatch(row, selectedFocus);
+              const focused =
+                !methodState.pending && isFocusMatch(row, selectedFocus);
 
               return (
                 <div
@@ -2407,63 +2623,88 @@ function App() {
 
       <section className="panel palace-rules-panel">
         <h2>10. Palace Rules Preview</h2>
-        <div className="recommendation-grid">
-          <div className="recommendation-card">
-            <strong>Original Palace</strong>
-            <p>
-              {palaceRules.originalPalace} / {palaceRules.originalElement}
-            </p>
+
+        {methodState.pending ? (
+          <div className="rule-conclusion">
+            <strong>Palace summary:</strong> {palaceRules.summary}
           </div>
-          <div className="recommendation-card">
-            <strong>Transformed Palace</strong>
-            <p>
-              {palaceRules.transformedPalace} /{" "}
-              {palaceRules.transformedElement}
-            </p>
-          </div>
-          <div className="recommendation-card">
-            <strong>Shi / Self Line</strong>
-            <p>Line {palaceRules.shiLine}</p>
-          </div>
-          <div className="recommendation-card">
-            <strong>Ying / Other Line</strong>
-            <p>Line {palaceRules.yingLine}</p>
-          </div>
-        </div>
-        <div className="rule-list">
-          {palaceRules.notes.map((note, index) => (
-            <div key={`${note.title}-${index}`} className="rule-card">
-              <strong>
-                Palace Rule {index + 1}: {note.title}
-              </strong>
-              <p>{note.text}</p>
+        ) : (
+          <>
+            <div className="recommendation-grid">
+              <div className="recommendation-card">
+                <strong>Original Palace</strong>
+                <p>
+                  {palaceRules.originalPalace} / {palaceRules.originalElement}
+                </p>
+              </div>
+              <div className="recommendation-card">
+                <strong>Transformed Palace</strong>
+                <p>
+                  {palaceRules.transformedPalace} /{" "}
+                  {palaceRules.transformedElement}
+                </p>
+              </div>
+              <div className="recommendation-card">
+                <strong>Shi / Self Line</strong>
+                <p>Line {palaceRules.shiLine}</p>
+              </div>
+              <div className="recommendation-card">
+                <strong>Ying / Other Line</strong>
+                <p>Line {palaceRules.yingLine}</p>
+              </div>
             </div>
-          ))}
-        </div>
-        <div className="rule-conclusion">
-          <strong>Palace summary:</strong> {palaceRules.summary}
-        </div>
+
+            <div className="rule-list">
+              {palaceRules.notes.map((note, index) => (
+                <div key={`${note.title}-${index}`} className="rule-card">
+                  <strong>
+                    Palace Rule {index + 1}: {note.title}
+                  </strong>
+                  <p>{note.text}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rule-conclusion">
+              <strong>Palace summary:</strong> {palaceRules.summary}
+            </div>
+          </>
+        )}
       </section>
-            <section className="panel hidden-spirit-panel">
+
+      <section className="panel hidden-spirit-panel">
         <h2>11. Hidden / Flying Spirit Preview</h2>
+
         <div className="recommendation-grid">
           <div className="recommendation-card">
             <strong>Hidden Spirit Status</strong>
-            <p>{hiddenSpirit.hiddenSpiritStatus}</p>
+            <p>
+              {hiddenSpirit.hiddenSpiritStatus ||
+                hiddenSpirit.status ||
+                "Method pending"}
+            </p>
           </div>
+
           <div className="recommendation-card">
             <strong>Flying Spirit Status</strong>
-            <p>{hiddenSpirit.flyingSpiritStatus}</p>
+            <p>
+              {hiddenSpirit.flyingSpiritStatus ||
+                hiddenSpirit.flyingStatus ||
+                "Method pending"}
+            </p>
           </div>
+
           <div className="recommendation-card">
             <strong>Selected Focus</strong>
-            <p>{hiddenSpirit.selectedFocus}</p>
+            <p>{hiddenSpirit.selectedFocus || selectedFocus}</p>
           </div>
+
           <div className="recommendation-card">
             <strong>Visible Focus Found</strong>
             <p>{hiddenSpirit.visibleFocusFound ? "Yes" : "No"}</p>
           </div>
         </div>
+
         <div className="rule-list">
           {hiddenSpirit.notes.map((note, index) => (
             <div key={`${note.title}-${index}`} className="rule-card">
@@ -2474,6 +2715,7 @@ function App() {
             </div>
           ))}
         </div>
+
         <div className="rule-conclusion">
           <strong>Hidden / Flying summary:</strong> {hiddenSpirit.summary}
         </div>
@@ -2485,63 +2727,86 @@ function App() {
           Copy a clean report of the current reading for saving, journaling, or
           comparing cases later.
         </p>
+
         <button className="export-button" onClick={copyReadingSummary}>
           {copied ? "Copied Summary" : "Copy Reading Summary"}
         </button>
+
         <textarea className="export-textarea" value={readingSummary} readOnly />
       </section>
-
-      <section className="panel result-panel">
+            <section className="panel result-panel">
         <h2>13. Protocol Preview</h2>
+
         <div className="summary-card">
           <p>
             <strong>Question:</strong>{" "}
-            {question.trim() ? question : "No final question entered yet."}
+            {effectiveQuestion
+              ? formatDraftQuestionLabel(draftQuestionState)
+              : "No final question entered yet."}
           </p>
+
           <p>
-            <strong>Selected method:</strong> {method.name}
+            <strong>Question source:</strong>{" "}
+            {getDraftQuestionSourceNote(draftQuestionState)}
           </p>
+
+          <p>
+            <strong>Selected method:</strong>{" "}
+            {methodState.pending ? "Method pending" : method.name}
+          </p>
+
           <p>
             <strong>Self:</strong> {selfRole.trim() ? selfRole : "Not set yet."}
           </p>
+
           <p>
             <strong>Object:</strong>{" "}
             {objectRole.trim() ? objectRole : "Not set yet."}
           </p>
+
           <p>
             <strong>Timeframe:</strong>{" "}
             {timeframe.trim() ? timeframe : "Not set yet."}
           </p>
+
           <p>
             <strong>Matter focus:</strong> {selectedFocus}
           </p>
+
           <p>
             <strong>Focus reading:</strong> {focusSummary}
           </p>
+
           <p>
             <strong>Rule conclusion:</strong> {ruleGraph.conclusion}
           </p>
+
           <p>
             <strong>Confidence:</strong>{" "}
             {recommendation.confidence || conflictReport.confidence}
           </p>
+
           <p>
             <strong>Calendar confidence:</strong> {calendarConfidence.level} —{" "}
             {calendarConfidence.score}/100
           </p>
+
           <p>
             <strong>Calendar note:</strong> {calendarConfidence.summary}
           </p>
+
           <p>
             <strong>Result meaning:</strong>{" "}
             {recommendation.plainMeaning ||
               recommendation.reason ||
               "No result meaning available yet."}
           </p>
+
           <p>
             <strong>Final judgment:</strong>{" "}
             {recommendation.finalJudgment || recommendation.result}
           </p>
+
           <p>
             <strong>Recommended action:</strong> {recommendation.action}
           </p>
@@ -2550,6 +2815,7 @@ function App() {
 
       <section className="panel snapshots-panel">
         <h2>14. Saved Reading Snapshots</h2>
+
         <p className="section-note">
           Save the current reading in this browser so you can reload, rename,
           annotate, search, sort, export, import, preview, copy, compare, and
@@ -2754,7 +3020,6 @@ function App() {
               </button>
             </label>
           </div>
-        
                     {compareSameReading ? (
             <p className="section-note" style={{ textAlign: "center" }}>
               Choose two different saved readings to compare.
@@ -2962,7 +3227,7 @@ function App() {
                         />
                         <DetailRow
                           label="Method"
-                          value={snapshot.selectedMethod || "Not set"}
+                          value={getMethodDisplayName(snapshot.selectedMethod)}
                         />
                         <DetailRow
                           label="Self"
