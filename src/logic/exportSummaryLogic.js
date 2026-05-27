@@ -13,6 +13,10 @@ function formatCalendarSource(calendarSource, manualCalendarMode) {
     return "Manual calendar override";
   }
 
+  if (calendarSource === "solar-term-foundation") {
+    return "Solar-term calendar foundation";
+  }
+
   if (calendarSource === "automatic" || calendarSource === "calculated") {
     return "Automatic calendar foundation";
   }
@@ -27,6 +31,10 @@ function formatCalendarSource(calendarSource, manualCalendarMode) {
 function formatCalendarStatus(calendarSource, manualCalendarMode) {
   if (manualCalendarMode || calendarSource === "manual") {
     return "Manual calendar override active";
+  }
+
+  if (calendarSource === "solar-term-foundation") {
+    return "Approximate solar-term foundation active";
   }
 
   if (calendarSource === "automatic" || calendarSource === "calculated") {
@@ -232,6 +240,11 @@ export function buildReadingSummary({
     ? `${manualDayStemData.label} / ${manualDayStemData.element}, ${manualDayStemData.polarity}`
     : "Not set";
 
+  const calendarFoundationNote =
+    calendarSource === "solar-term-foundation"
+      ? "Calendar Foundation Note: Month branch is selected from approximate solar-term boundaries. This foundation should later be replaced by an almanac-grade true solar-term engine."
+      : "";
+
   return `WEN WANG GUA MVP READING SUMMARY
 
 QUESTION
@@ -254,6 +267,7 @@ Location / Timezone: ${formatValue(location)}
 Day Change Rule: ${formatValue(dayChangeRule, "23:00")}
 Calendar Source: ${calendarSourceLabel}
 Chinese Calendar Status: ${calendarStatusLabel}
+${calendarFoundationNote}
 ${formatCalendarConfidence(calendarConfidence)}
 ${
   manualCalendarMode
