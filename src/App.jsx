@@ -2754,7 +2754,7 @@ function App() {
               </button>
             </label>
           </div>
-          send App.jsx part 9 and I’ll send the final part.
+        
                     {compareSameReading ? (
             <p className="section-note" style={{ textAlign: "center" }}>
               Choose two different saved readings to compare.
