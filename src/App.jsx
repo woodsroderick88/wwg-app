@@ -58,6 +58,10 @@ import {
   getDraftQuestionSourceNote,
 } from "./logic/questionDraftLogic";
 import {
+  buildSetupCompletion,
+  buildSetupCompletionExport,
+} from "./logic/setupCompletionLogic";
+import {
   buildSnapshotsExportJson,
   clearSavedSnapshots,
   createSnapshot,
@@ -234,7 +238,6 @@ ${movingLinesText}
 Casting note:
 This chart was entered through Manual Hexagram Entry. The original King Wen hexagram number and moving lines were used to populate the six-line structure and calculate the transformed hexagram.`;
 }
-
 function buildSnapshotDetailsText(snapshot) {
   const linesText =
     (snapshot.lines || [])
@@ -311,6 +314,7 @@ function DetailSection({ title, children }) {
     </div>
   );
 }
+
 function DetailRow({ label, value }) {
   return (
     <div
@@ -439,6 +443,50 @@ function DraftQuestionCard({ draftQuestionState }) {
   );
 }
 
+function SetupCompletionCard({ setupCompletion, onApplyTimeframe }) {
+  if (!setupCompletion) {
+    return null;
+  }
+
+  return (
+    <div className="recommendation-card recommendation-action">
+      <strong>Setup Completion</strong>
+      <p>
+        {setupCompletion.mode} — {setupCompletion.score}/100
+      </p>
+      <p>
+        <strong>{setupCompletion.readinessLabel}</strong>
+      </p>
+      <p>{setupCompletion.summary}</p>
+
+      {setupCompletion.inferredTimeframe &&
+      setupCompletion.missingRequired.some((item) => item.id === "timeframe") ? (
+        <button onClick={onApplyTimeframe}>
+          Use detected timeframe: {setupCompletion.inferredTimeframe}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function SetupChecklist({ setupCompletion }) {
+  if (!setupCompletion?.checklist?.length) {
+    return null;
+  }
+
+  return (
+    <div className="rule-list">
+      {setupCompletion.checklist.map((item) => (
+        <div key={item.id} className="rule-card">
+          <strong>
+            {item.complete ? "✓" : "•"} {item.label} — {item.status}
+          </strong>
+          <p>{item.text}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 function App() {
   const [rawQuestion, setRawQuestion] = useState("");
   const [clarifiedIntent, setClarifiedIntent] = useState("");
@@ -684,6 +732,25 @@ function App() {
     calendarStatusNote,
   });
 
+  const setupCompletion = buildSetupCompletion({
+    rawQuestion,
+    effectiveQuestion,
+    finalCastingQuestion: question,
+    selfRole,
+    objectRole,
+    timeframe,
+    knownFacts,
+    castingDate,
+    castingTime,
+    location,
+    selectedMethod: effectiveMethodId,
+    methodPending: methodState.pending,
+    draftQuestionState,
+    calendarConfidence,
+  });
+
+  const setupCompletionExport = buildSetupCompletionExport(setupCompletion);
+
   const warnings = getQuestionWarnings(
     effectiveQuestion,
     selfRole,
@@ -705,6 +772,10 @@ function App() {
 
   if (methodState.pending) {
     warnings.push("Select or refine a method before relying on the reading.");
+  }
+
+  if (setupCompletion.nextActions.length > 0) {
+    warnings.push(`Setup Completion: ${setupCompletion.readinessLabel}.`);
   }
 
   if (manualCalendarMode) {
@@ -844,8 +915,7 @@ function App() {
         clarityScore,
         calendarConfidence,
       });
-
-  const palaceRules = methodState.pending
+        const palaceRules = methodState.pending
     ? {
         summary:
           "Palace rules are waiting for a selected method and useful-spirit focus.",
@@ -889,7 +959,8 @@ function App() {
         movingLines,
         palaceRules,
       });
-        const questionRefinementSummary = buildQuestionRefinementSummary(
+
+  const questionRefinementSummary = buildQuestionRefinementSummary(
     questionRefinement
   );
 
@@ -955,6 +1026,8 @@ Note: ${draftQuestionState.note}`
       : "";
 
   const readingSummary = `${questionRefinementSummary}${draftQuestionExportNote}
+
+${setupCompletionExport}
 
 ${coinCastingHistory.length ? coinCastingSummary : manualHexagramSummary}
 
@@ -1042,6 +1115,18 @@ ${readingSummaryCore}`;
     setAssumptions("");
     setEmotionalTone("");
     setSelectedQuestionIntent("");
+  }
+
+  function applyDetectedTimeframe() {
+    if (!setupCompletion.inferredTimeframe) {
+      setSnapshotStatus("No timeframe was detected from the current question.");
+      return;
+    }
+
+    setTimeframe(setupCompletion.inferredTimeframe);
+    setSnapshotStatus(`Detected timeframe applied: ${setupCompletion.inferredTimeframe}.`);
+    setCopied(false);
+    setDeleteConfirmArmed(false);
   }
 
   function resetCurrentReading() {
@@ -1136,8 +1221,7 @@ ${readingSummaryCore}`;
     clearSnapshotEditModes();
     scrollToQuestionSection();
   }
-
-  function useSuggestedFinalQuestion() {
+    function useSuggestedFinalQuestion() {
     if (!questionRefinement.suggestedFinalQuestion) {
       setSnapshotStatus("Add a raw question before generating a final question.");
       return;
@@ -1171,6 +1255,14 @@ ${readingSummaryCore}`;
       return;
     }
 
+    if (!setupCompletion.requiredReady) {
+      setSnapshotStatus(
+        "Setup is not ready yet. Complete the required checklist before casting."
+      );
+      setDeleteConfirmArmed(false);
+      return;
+    }
+
     if (VALID_METHOD_IDS.includes(methodHint) && selectedMethod !== methodHint) {
       setSelectedMethod(methodHint);
       setManualFocus("");
@@ -1190,7 +1282,8 @@ ${readingSummaryCore}`;
     setDeleteConfirmArmed(false);
     clearSnapshotEditModes();
   }
-    function applyManualHexagramEntry() {
+
+  function applyManualHexagramEntry() {
     const result = buildManualHexagramEntry({
       originalHexagramNumber: manualHexagramNumber,
       movingLinesText: manualHexagramMovingLines,
@@ -1391,8 +1484,7 @@ ${readingSummaryCore}`;
       setCompareSnapshotBId("");
     }
   }
-
-  function deleteAllSavedSnapshots() {
+    function deleteAllSavedSnapshots() {
     if (savedSnapshots.length === 0) {
       setSnapshotStatus("No saved readings to delete.");
       setDeleteConfirmArmed(false);
@@ -1451,7 +1543,8 @@ ${readingSummaryCore}`;
     setSnapshotStatus("Renamed saved reading.");
     setDeleteConfirmArmed(false);
   }
-    function startEditSnapshotNote(snapshot) {
+
+  function startEditSnapshotNote(snapshot) {
     setEditingNoteSnapshotId(snapshot.id);
     setNoteDraft(snapshot.note || "");
     setRenamingSnapshotId("");
@@ -1616,8 +1709,7 @@ ${readingSummaryCore}`;
           ))}
         </div>
       </section>
-
-      <section className="panel" id="question-section">
+            <section className="panel" id="question-section">
         <h2>1. Question Refinement Engine</h2>
         <p className="section-note">
           Clarify the question before casting so the method, Self/Object coding,
@@ -1690,7 +1782,8 @@ ${readingSummaryCore}`;
             </select>
           </label>
         </div>
-                <div className="field-grid">
+
+        <div className="field-grid">
           <label>
             Known facts
             <textarea
@@ -1820,11 +1913,21 @@ ${readingSummaryCore}`;
 
           <div className="recommendation-card">
             <strong>Ready to Cast</strong>
-            <p>{questionRefinement.readyToCast && !methodState.pending ? "Yes" : "No"}</p>
+            <p>
+              {questionRefinement.readyToCast &&
+              setupCompletion.requiredReady &&
+              !methodState.pending
+                ? "Yes"
+                : "No"}
+            </p>
           </div>
 
           <MethodPendingCard methodState={methodState} />
           <DraftQuestionCard draftQuestionState={draftQuestionState} />
+          <SetupCompletionCard
+            setupCompletion={setupCompletion}
+            onApplyTimeframe={applyDetectedTimeframe}
+          />
         </div>
 
         {questionRefinement.warnings.length > 0 || methodState.pending ? (
@@ -1840,6 +1943,9 @@ ${readingSummaryCore}`;
                 apply or enter a final casting question.
               </li>
             )}
+            {setupCompletion.nextActions.map((action, index) => (
+              <li key={`setup-action-${index}`}>{action}</li>
+            ))}
             {questionRefinement.warnings.map((warning) => (
               <li key={warning}>{warning}</li>
             ))}
@@ -1850,8 +1956,7 @@ ${readingSummaryCore}`;
           </p>
         )}
       </section>
-
-      <section className="panel">
+            <section className="panel">
         <h2>2. Choose the reading method</h2>
 
         <div className="recommendation-box">
@@ -1923,8 +2028,18 @@ ${readingSummaryCore}`;
             {questionRefinement.detectedIntent.label}
           </p>
         </div>
+
+        <div className="recommendation-grid">
+          <SetupCompletionCard
+            setupCompletion={setupCompletion}
+            onApplyTimeframe={applyDetectedTimeframe}
+          />
+        </div>
+
+        <SetupChecklist setupCompletion={setupCompletion} />
       </section>
-            <section className="panel">
+
+      <section className="panel">
         <h2>4. Calendar Engine Setup</h2>
         <p className="section-note">
           WWG depends on Gregorian date and time converted into Chinese
@@ -2089,8 +2204,7 @@ ${readingSummaryCore}`;
             <strong>Location / timezone:</strong>{" "}
             {location.trim() ? location : "Not set yet."}
           </p>
-
-          <p>
+                    <p>
             <strong>Chinese month branch:</strong> {monthBranch.label} /{" "}
             {monthBranch.element}
           </p>
@@ -2132,12 +2246,40 @@ ${readingSummaryCore}`;
       </section>
 
       <section className="panel">
-        <h2>5. Question Quality Check</h2>
+        <h2>5. Question Quality + Setup Completion</h2>
 
         <div className="score-row">
           <span>Overall Clarity Score</span>
           <strong>{clarityScore}/100</strong>
         </div>
+
+        <div className="score-row">
+          <span>Setup Completion</span>
+          <strong>
+            {setupCompletion.mode} — {setupCompletion.score}/100
+          </strong>
+        </div>
+
+        <div className="recommendation-grid">
+          <SetupCompletionCard
+            setupCompletion={setupCompletion}
+            onApplyTimeframe={applyDetectedTimeframe}
+          />
+          <CalendarConfidenceCard calendarConfidence={calendarConfidence} />
+        </div>
+
+        {setupCompletion.nextActions.length > 0 && (
+          <div className="recommendation-box">
+            <strong>Next setup actions:</strong>
+            <ul className="warning-list">
+              {setupCompletion.nextActions.map((action, index) => (
+                <li key={`next-action-${index}`}>{action}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <SetupChecklist setupCompletion={setupCompletion} />
 
         {warnings.length > 0 ? (
           <ul className="warning-list">
@@ -2173,6 +2315,13 @@ ${readingSummaryCore}`;
           <div className="recommendation-box">
             <strong>Method pending:</strong> enter or refine a question before
             casting if you want this chart to become a coded WWG reading.
+          </div>
+        )}
+
+        {!setupCompletion.requiredReady && (
+          <div className="recommendation-box">
+            <strong>Setup incomplete:</strong> complete the required checklist
+            before using three-coin casting.
           </div>
         )}
 
@@ -2239,7 +2388,8 @@ ${readingSummaryCore}`;
             </pre>
           )}
         </div>
-                {coinCastingHistory.length > 0 && (
+
+        {coinCastingHistory.length > 0 && (
           <div className="rule-list">
             {coinCastingHistory.map((result) => (
               <div key={result.lineNumber} className="rule-card">
@@ -2266,8 +2416,7 @@ ${readingSummaryCore}`;
             </div>
           ))}
         </div>
-
-        <div className="casting-layout">
+                <div className="casting-layout">
           <div className="line-controls">
             {lines.map((lineKey, index) => (
               <label key={index}>
@@ -2477,7 +2626,8 @@ ${readingSummaryCore}`;
               </select>
             </label>
           </div>
-                    <div className="six-kins-summary">
+
+          <div className="six-kins-summary">
             <p>
               <strong>Using original hexagram element:</strong>{" "}
               {originalHexagram.palace.element}
@@ -2489,8 +2639,7 @@ ${readingSummaryCore}`;
               <strong>Active Void:</strong> {voidPair.label}
             </p>
           </div>
-
-          <div className="six-kins-grid">
+                    <div className="six-kins-grid">
             {sixKinRows.map((row, index) => {
               const focused =
                 !methodState.pending && isFocusMatch(row, selectedFocus);
@@ -2671,8 +2820,7 @@ ${readingSummaryCore}`;
           </>
         )}
       </section>
-
-      <section className="panel hidden-spirit-panel">
+            <section className="panel hidden-spirit-panel">
         <h2>11. Hidden / Flying Spirit Preview</h2>
 
         <div className="recommendation-grid">
@@ -2734,7 +2882,8 @@ ${readingSummaryCore}`;
 
         <textarea className="export-textarea" value={readingSummary} readOnly />
       </section>
-            <section className="panel result-panel">
+
+      <section className="panel result-panel">
         <h2>13. Protocol Preview</h2>
 
         <div className="summary-card">
@@ -2748,6 +2897,16 @@ ${readingSummaryCore}`;
           <p>
             <strong>Question source:</strong>{" "}
             {getDraftQuestionSourceNote(draftQuestionState)}
+          </p>
+
+          <p>
+            <strong>Setup mode:</strong> {setupCompletion.mode} —{" "}
+            {setupCompletion.score}/100
+          </p>
+
+          <p>
+            <strong>Setup readiness:</strong>{" "}
+            {setupCompletion.readinessLabel}
           </p>
 
           <p>
@@ -2915,8 +3074,7 @@ ${readingSummaryCore}`;
             readings.
           </p>
         )}
-
-        <div
+                <div
           style={{
             marginTop: "26px",
             marginBottom: "26px",
@@ -3020,7 +3178,8 @@ ${readingSummaryCore}`;
               </button>
             </label>
           </div>
-                    {compareSameReading ? (
+
+          {compareSameReading ? (
             <p className="section-note" style={{ textAlign: "center" }}>
               Choose two different saved readings to compare.
             </p>
@@ -3190,7 +3349,9 @@ ${readingSummaryCore}`;
                         <button onClick={() => loadSnapshot(snapshot)}>
                           Load
                         </button>
-                        <button onClick={() => toggleSnapshotDetails(snapshot.id)}>
+                        <button
+                          onClick={() => toggleSnapshotDetails(snapshot.id)}
+                        >
                           {isViewingDetails ? "Hide Details" : "View Details"}
                         </button>
                         <button onClick={() => copySnapshotDetails(snapshot)}>
