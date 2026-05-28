@@ -62,6 +62,14 @@ import {
   buildSetupCompletionExport,
 } from "./logic/setupCompletionLogic";
 import {
+  buildQuickAppMoneyObject,
+  buildQuickChicagoLocation,
+  buildQuickKnownFact,
+  buildQuickSelfBusiness,
+  buildSetupAutofillPatch,
+  setupAutofillPresets,
+} from "./logic/setupAutofillLogic";
+import {
   buildSnapshotsExportJson,
   clearSavedSnapshots,
   createSnapshot,
@@ -188,7 +196,6 @@ function getMethodDisplayName(methodId) {
 function normalizeMethodForSave(methodId) {
   return SELECTABLE_METHOD_IDS.includes(methodId) ? methodId : METHOD_PENDING_ID;
 }
-
 function buildManualHexagramExportSummary({
   manualHexagramNumber,
   manualHexagramMovingLines,
@@ -238,6 +245,7 @@ ${movingLinesText}
 Casting note:
 This chart was entered through Manual Hexagram Entry. The original King Wen hexagram number and moving lines were used to populate the six-line structure and calculate the transformed hexagram.`;
 }
+
 function buildSnapshotDetailsText(snapshot) {
   const linesText =
     (snapshot.lines || [])
@@ -388,7 +396,6 @@ function RecommendationList({ items, fallback }) {
     </ul>
   );
 }
-
 function CalendarConfidenceCard({ calendarConfidence }) {
   if (!calendarConfidence) {
     return null;
@@ -484,6 +491,56 @@ function SetupChecklist({ setupCompletion }) {
           <p>{item.text}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function SetupAutofillPanel({ onApplyPreset }) {
+  return (
+    <div className="focus-panel">
+      <h3>Setup Autofill Helpers</h3>
+      <p className="section-note">
+        Use these helpers to quickly fill Self, Object, known facts,
+        assumptions, location, and detected timeframe without overwriting your
+        current question.
+      </p>
+
+      <div className="preset-grid">
+        {setupAutofillPresets.map((preset) => (
+          <button
+            key={preset.id}
+            className="preset-card"
+            onClick={() => onApplyPreset(preset.id)}
+          >
+            <strong>{preset.label}</strong>
+            <span>{preset.description}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function QuickSetupButtons({
+  onQuickSelf,
+  onQuickObject,
+  onQuickKnownFact,
+  onQuickLocation,
+  onApplyTimeframe,
+  showTimeframeButton,
+  inferredTimeframe,
+}) {
+  return (
+    <div className="snapshot-actions" style={{ justifyContent: "flex-start" }}>
+      <button onClick={onQuickSelf}>Quick Self</button>
+      <button onClick={onQuickObject}>Quick Object</button>
+      <button onClick={onQuickKnownFact}>Quick Known Fact</button>
+      <button onClick={onQuickLocation}>Quick Location</button>
+      {showTimeframeButton ? (
+        <button onClick={onApplyTimeframe}>
+          Use detected timeframe: {inferredTimeframe}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -612,8 +669,7 @@ function App() {
       ? questionRefinement.methodHints[0]
       : fallbackRecommendedMethodId
     : METHOD_PENDING_ID;
-
-  useEffect(() => {
+      useEffect(() => {
     const methodHint = questionRefinement.methodHints?.[0];
 
     if (
@@ -683,7 +739,8 @@ function App() {
           "No useful-spirit focus has been selected yet because the question method is pending.",
       }
     : focusOptions.find((focus) => focus.key === selectedFocus);
-      const calendarContext = buildCalendarContext({
+
+  const calendarContext = buildCalendarContext({
     castingDate,
     castingTime,
     dayChangeRule,
@@ -803,8 +860,7 @@ function App() {
   }
 
   const clarityScore = Math.max(0, 100 - warnings.length * 14);
-
-  const movingLines = lines
+    const movingLines = lines
     .map((lineKey, index) => (lineTypes[lineKey].moving ? index + 1 : null))
     .filter(Boolean);
 
@@ -915,7 +971,8 @@ function App() {
         clarityScore,
         calendarConfidence,
       });
-        const palaceRules = methodState.pending
+
+  const palaceRules = methodState.pending
     ? {
         summary:
           "Palace rules are waiting for a selected method and useful-spirit focus.",
@@ -974,8 +1031,7 @@ function App() {
     transformedHexagram,
     movingLines,
   });
-
-  const readingSummaryCore = buildReadingSummary({
+    const readingSummaryCore = buildReadingSummary({
     question: effectiveQuestion,
     selectedMethod: effectiveMethodId,
     method,
@@ -1124,12 +1180,75 @@ ${readingSummaryCore}`;
     }
 
     setTimeframe(setupCompletion.inferredTimeframe);
-    setSnapshotStatus(`Detected timeframe applied: ${setupCompletion.inferredTimeframe}.`);
+    setSnapshotStatus(
+      `Detected timeframe applied: ${setupCompletion.inferredTimeframe}.`
+    );
     setCopied(false);
     setDeleteConfirmArmed(false);
   }
 
-  function resetCurrentReading() {
+  function applySetupAutofillPreset(presetId) {
+    const result = buildSetupAutofillPatch({
+      presetId,
+      currentState: {
+        selfRole,
+        objectRole,
+        knownFacts,
+        assumptions,
+        location,
+        timeframe,
+      },
+      detectedTimeframe: setupCompletion.inferredTimeframe,
+    });
+
+    if (!result.ok) {
+      setSnapshotStatus(result.message);
+      return;
+    }
+
+    setSelfRole(result.patch.selfRole);
+    setObjectRole(result.patch.objectRole);
+    setKnownFacts(result.patch.knownFacts);
+    setAssumptions(result.patch.assumptions);
+    setLocation(result.patch.location);
+
+    if (result.patch.timeframe) {
+      setTimeframe(result.patch.timeframe);
+    }
+
+    setSnapshotStatus(result.message);
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+  function quickFillSelfBusiness() {
+    setSelfRole((currentValue) => buildQuickSelfBusiness(currentValue));
+    setSnapshotStatus("Quick Self applied.");
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+  function quickFillAppMoneyObject() {
+    setObjectRole((currentValue) => buildQuickAppMoneyObject(currentValue));
+    setSnapshotStatus("Quick Object applied.");
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+  function quickFillKnownFact() {
+    setKnownFacts((currentValue) => buildQuickKnownFact(currentValue));
+    setSnapshotStatus("Quick Known Fact applied.");
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+  function quickFillChicagoLocation() {
+    setLocation((currentValue) => buildQuickChicagoLocation(currentValue));
+    setSnapshotStatus("Quick Location applied.");
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+    function resetCurrentReading() {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
     setManualHexagramNumber("");
@@ -1221,7 +1340,8 @@ ${readingSummaryCore}`;
     clearSnapshotEditModes();
     scrollToQuestionSection();
   }
-    function useSuggestedFinalQuestion() {
+
+  function useSuggestedFinalQuestion() {
     if (!questionRefinement.suggestedFinalQuestion) {
       setSnapshotStatus("Add a raw question before generating a final question.");
       return;
@@ -1328,8 +1448,7 @@ ${readingSummaryCore}`;
       );
     }
   }
-
-  async function copySnapshotCompare() {
+    async function copySnapshotCompare() {
     if (compareSameReading) {
       setSnapshotStatus("Choose two different saved readings before copying.");
       return;
@@ -1484,7 +1603,8 @@ ${readingSummaryCore}`;
       setCompareSnapshotBId("");
     }
   }
-    function deleteAllSavedSnapshots() {
+
+  function deleteAllSavedSnapshots() {
     if (savedSnapshots.length === 0) {
       setSnapshotStatus("No saved readings to delete.");
       setDeleteConfirmArmed(false);
@@ -1543,8 +1663,7 @@ ${readingSummaryCore}`;
     setSnapshotStatus("Renamed saved reading.");
     setDeleteConfirmArmed(false);
   }
-
-  function startEditSnapshotNote(snapshot) {
+    function startEditSnapshotNote(snapshot) {
     setEditingNoteSnapshotId(snapshot.id);
     setNoteDraft(snapshot.note || "");
     setRenamingSnapshotId("");
@@ -1674,6 +1793,10 @@ ${readingSummaryCore}`;
         }
       : undefined;
 
+  const showTimeframeQuickButton =
+    Boolean(setupCompletion.inferredTimeframe) &&
+    setupCompletion.missingRequired.some((item) => item.id === "timeframe");
+
   return (
     <main className="app-shell">
       <section className="hero">
@@ -1727,6 +1850,18 @@ ${readingSummaryCore}`;
             placeholder="Example: Will this app make money?"
           />
         </label>
+
+        <SetupAutofillPanel onApplyPreset={applySetupAutofillPreset} />
+
+        <QuickSetupButtons
+          onQuickSelf={quickFillSelfBusiness}
+          onQuickObject={quickFillAppMoneyObject}
+          onQuickKnownFact={quickFillKnownFact}
+          onQuickLocation={quickFillChicagoLocation}
+          onApplyTimeframe={applyDetectedTimeframe}
+          showTimeframeButton={showTimeframeQuickButton}
+          inferredTimeframe={setupCompletion.inferredTimeframe}
+        />
 
         <div className="field-grid">
           <label>
@@ -1867,8 +2002,7 @@ ${readingSummaryCore}`;
         <button className="export-button" onClick={useSuggestedFinalQuestion}>
           Use Suggested Final Question
         </button>
-
-        {draftQuestionState.isDraft && draftQuestionState.question && (
+                {draftQuestionState.isDraft && draftQuestionState.question && (
           <div className="recommendation-box">
             <strong>Draft final question in use:</strong>{" "}
             {formatDraftQuestionLabel(draftQuestionState)}
@@ -1956,7 +2090,8 @@ ${readingSummaryCore}`;
           </p>
         )}
       </section>
-            <section className="panel">
+
+      <section className="panel">
         <h2>2. Choose the reading method</h2>
 
         <div className="recommendation-box">
@@ -2036,10 +2171,19 @@ ${readingSummaryCore}`;
           />
         </div>
 
+        <QuickSetupButtons
+          onQuickSelf={quickFillSelfBusiness}
+          onQuickObject={quickFillAppMoneyObject}
+          onQuickKnownFact={quickFillKnownFact}
+          onQuickLocation={quickFillChicagoLocation}
+          onApplyTimeframe={applyDetectedTimeframe}
+          showTimeframeButton={showTimeframeQuickButton}
+          inferredTimeframe={setupCompletion.inferredTimeframe}
+        />
+
         <SetupChecklist setupCompletion={setupCompletion} />
       </section>
-
-      <section className="panel">
+            <section className="panel">
         <h2>4. Calendar Engine Setup</h2>
         <p className="section-note">
           WWG depends on Gregorian date and time converted into Chinese
@@ -2097,6 +2241,16 @@ ${readingSummaryCore}`;
             </select>
           </label>
         </div>
+
+        <QuickSetupButtons
+          onQuickSelf={quickFillSelfBusiness}
+          onQuickObject={quickFillAppMoneyObject}
+          onQuickKnownFact={quickFillKnownFact}
+          onQuickLocation={quickFillChicagoLocation}
+          onApplyTimeframe={applyDetectedTimeframe}
+          showTimeframeButton={showTimeframeQuickButton}
+          inferredTimeframe={setupCompletion.inferredTimeframe}
+        />
 
         <label className="checkbox-row">
           <input
@@ -2204,7 +2358,8 @@ ${readingSummaryCore}`;
             <strong>Location / timezone:</strong>{" "}
             {location.trim() ? location : "Not set yet."}
           </p>
-                    <p>
+
+          <p>
             <strong>Chinese month branch:</strong> {monthBranch.label} /{" "}
             {monthBranch.element}
           </p>
@@ -2244,8 +2399,7 @@ ${readingSummaryCore}`;
           <CalendarConfidenceCard calendarConfidence={calendarConfidence} />
         </div>
       </section>
-
-      <section className="panel">
+            <section className="panel">
         <h2>5. Question Quality + Setup Completion</h2>
 
         <div className="score-row">
@@ -2267,6 +2421,16 @@ ${readingSummaryCore}`;
           />
           <CalendarConfidenceCard calendarConfidence={calendarConfidence} />
         </div>
+
+        <QuickSetupButtons
+          onQuickSelf={quickFillSelfBusiness}
+          onQuickObject={quickFillAppMoneyObject}
+          onQuickKnownFact={quickFillKnownFact}
+          onQuickLocation={quickFillChicagoLocation}
+          onApplyTimeframe={applyDetectedTimeframe}
+          showTimeframeButton={showTimeframeQuickButton}
+          inferredTimeframe={setupCompletion.inferredTimeframe}
+        />
 
         {setupCompletion.nextActions.length > 0 && (
           <div className="recommendation-box">
@@ -2416,7 +2580,8 @@ ${readingSummaryCore}`;
             </div>
           ))}
         </div>
-                <div className="casting-layout">
+
+        <div className="casting-layout">
           <div className="line-controls">
             {lines.map((lineKey, index) => (
               <label key={index}>
@@ -2438,8 +2603,7 @@ ${readingSummaryCore}`;
               </label>
             ))}
           </div>
-
-          <div className="hexagram-comparison">
+                    <div className="hexagram-comparison">
             <div className="hexagram-card">
               <p>Original Hexagram</p>
               <div className="hexagram-lines">
@@ -2639,7 +2803,8 @@ ${readingSummaryCore}`;
               <strong>Active Void:</strong> {voidPair.label}
             </p>
           </div>
-                    <div className="six-kins-grid">
+
+          <div className="six-kins-grid">
             {sixKinRows.map((row, index) => {
               const focused =
                 !methodState.pending && isFocusMatch(row, selectedFocus);
@@ -2657,8 +2822,7 @@ ${readingSummaryCore}`;
                     Line {row.lineNumber}
                     {focused ? " ★" : ""}
                   </strong>
-
-                  <select
+                                    <select
                     value={row.branch.key}
                     onChange={(event) => {
                       updateLineBranch(index, event.target.value);
@@ -2820,7 +2984,8 @@ ${readingSummaryCore}`;
           </>
         )}
       </section>
-            <section className="panel hidden-spirit-panel">
+
+      <section className="panel hidden-spirit-panel">
         <h2>11. Hidden / Flying Spirit Preview</h2>
 
         <div className="recommendation-grid">
@@ -2832,8 +2997,7 @@ ${readingSummaryCore}`;
                 "Method pending"}
             </p>
           </div>
-
-          <div className="recommendation-card">
+                    <div className="recommendation-card">
             <strong>Flying Spirit Status</strong>
             <p>
               {hiddenSpirit.flyingSpiritStatus ||
@@ -3028,8 +3192,7 @@ ${readingSummaryCore}`;
             </select>
           </label>
         </div>
-
-        <input
+                <input
           ref={importFileInputRef}
           type="file"
           accept="application/json,.json"
@@ -3074,7 +3237,8 @@ ${readingSummaryCore}`;
             readings.
           </p>
         )}
-                <div
+
+        <div
           style={{
             marginTop: "26px",
             marginBottom: "26px",
