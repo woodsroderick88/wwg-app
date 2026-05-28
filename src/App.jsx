@@ -54,6 +54,7 @@ import {
 } from "./logic/methodStateLogic";
 import {
   buildDraftFinalQuestion,
+  cleanQuestionText,
   formatDraftQuestionLabel,
   getDraftQuestionSourceNote,
 } from "./logic/questionDraftLogic";
@@ -1347,7 +1348,7 @@ ${readingSummaryCore}`;
       return;
     }
 
-    setQuestion(questionRefinement.suggestedFinalQuestion);
+    setQuestion(cleanQuestionText(questionRefinement.suggestedFinalQuestion));
 
     const methodHint = questionRefinement.methodHints?.[0];
 
@@ -1996,7 +1997,7 @@ ${readingSummaryCore}`;
 
         <div className="recommendation-box">
           <strong>Suggested final question:</strong>{" "}
-          {questionRefinement.suggestedFinalQuestion || "Add a raw question."}
+          {cleanQuestionText(questionRefinement.suggestedFinalQuestion) || "Add a raw question."}
         </div>
 
         <button className="export-button" onClick={useSuggestedFinalQuestion}>

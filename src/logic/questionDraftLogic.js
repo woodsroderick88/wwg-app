@@ -7,14 +7,54 @@ const FIELD_LABEL_PATTERNS = [
   /^draft\s+final\s+question\s*:\s*/i,
 ];
 
+const INLINE_FIELD_LABEL_PATTERNS = [
+  /\braw\s+question\s*:\s*/gi,
+  /\bfinal\s+casting\s+question\s*:\s*/gi,
+  /\bcasting\s+question\s*:\s*/gi,
+  /\bsuggested\s+final\s+question\s*:\s*/gi,
+  /\bdraft\s+final\s+question\s*:\s*/gi,
+];
+
+const UI_ACTION_PATTERNS = [
+  /^use\s+detected\s+timeframe\s*:\s*/i,
+  /^detected\s+timeframe\s*:\s*/i,
+  /^use\s+suggested\s+final\s+question\s*$/i,
+  /^copy\s+reading\s+summary\s*$/i,
+  /^save\s+current\s+reading\s*$/i,
+];
+
 function clean(value) {
   return String(value || "").trim();
+}
+
+function startsWithUiAction(value) {
+  const text = clean(value);
+
+  if (!text) {
+    return false;
+  }
+
+  return UI_ACTION_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function stripInlineLabels(value) {
+  let text = clean(value);
+
+  for (const pattern of INLINE_FIELD_LABEL_PATTERNS) {
+    text = text.replace(pattern, "").trim();
+  }
+
+  return text;
 }
 
 export function stripPastedQuestionLabels(value) {
   let text = clean(value);
 
   if (!text) {
+    return "";
+  }
+
+  if (startsWithUiAction(text)) {
     return "";
   }
 
@@ -29,6 +69,12 @@ export function stripPastedQuestionLabels(value) {
       text = text.replace(pattern, "").trim();
     }
 
+    text = stripInlineLabels(text);
+
+    if (startsWithUiAction(text)) {
+      return "";
+    }
+
     if (text !== before) {
       changed = true;
     }
@@ -36,18 +82,27 @@ export function stripPastedQuestionLabels(value) {
 
   const lines = text
     .split(/\r?\n/)
-    .map((line) => clean(line))
+    .map((line) => stripInlineLabels(clean(line)))
     .filter(Boolean);
 
   if (lines.length <= 1) {
-    return clean(text);
+    return stripInlineLabels(text);
   }
 
   const cleanedLines = lines.filter((line) => {
-    return !FIELD_LABEL_PATTERNS.some((pattern) => pattern.test(line));
+    const isFieldLabel = FIELD_LABEL_PATTERNS.some((pattern) =>
+      pattern.test(line)
+    );
+    const isUiAction = UI_ACTION_PATTERNS.some((pattern) => pattern.test(line));
+
+    return !isFieldLabel && !isUiAction;
   });
 
   return cleanedLines.join("\n").trim();
+}
+
+export function cleanQuestionText(value) {
+  return stripPastedQuestionLabels(value);
 }
 
 export function buildDraftFinalQuestion({
