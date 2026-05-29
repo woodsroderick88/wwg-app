@@ -1357,13 +1357,13 @@ ${readingSummaryCore}`;
     setCastingDate(nextDateTime.castingDate);
     setCastingTime(nextDateTime.castingTime);
 
-    if (selectedMethod !== "GLDM") {
+        if (selectedMethod !== "GLDM") {
       setSelectedMethod("GLDM");
       setManualFocus("");
     }
 
     setSnapshotStatus(
-      `One-click App Money Ready Setup applied: ${nextDateTime.castingDate} ${nextDateTime.castingTime}.`
+      `App money setup applied. Ready to cast: ${nextDateTime.castingDate} ${nextDateTime.castingTime}.`
     );
     setCopied(false);
     setDeleteConfirmArmed(false);
