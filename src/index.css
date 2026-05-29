@@ -109,3 +109,21 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+.preset-card-active {
+  border-color: rgba(255, 183, 77, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 183, 77, 0.25),
+    0 18px 42px rgba(255, 183, 77, 0.14);
+  background: rgba(255, 183, 77, 0.12);
+}
+
+.preset-card-active::after {
+  content: "Applied";
+  display: inline-block;
+  margin-top: 14px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #1f160d;
+  background: #ffb74d;
+}

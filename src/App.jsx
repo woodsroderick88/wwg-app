@@ -502,7 +502,7 @@ function SetupChecklist({ setupCompletion }) {
   );
 }
 
-function SetupAutofillPanel({ onApplyPreset }) {
+function SetupAutofillPanel({ activePresetId, onApplyPreset }) {
   return (
     <div className="focus-panel">
       <h3>Setup Autofill Helpers</h3>
@@ -516,7 +516,11 @@ function SetupAutofillPanel({ onApplyPreset }) {
         {setupAutofillPresets.map((preset) => (
           <button
             key={preset.id}
-            className="preset-card"
+            className={
+  activePresetId === preset.id
+    ? "preset-card preset-card-active"
+    : "preset-card"
+}
             onClick={() => onApplyPreset(preset.id)}
           >
             <strong>{preset.label}</strong>
@@ -565,6 +569,7 @@ function DateTimeAutofillButtons({
   );
 }
 function App() {
+  const [activeSetupPresetId, setActiveSetupPresetId] = useState("");
   const [rawQuestion, setRawQuestion] = useState("");
   const [clarifiedIntent, setClarifiedIntent] = useState("");
   const [knownFacts, setKnownFacts] = useState("");
@@ -1208,6 +1213,7 @@ ${readingSummaryCore}`;
   }
 
   function applySetupAutofillPreset(presetId) {
+        setActiveSetupPresetId(presetId);
         if (presetId === "app-money") {
       runOneClickAppMoneyReadySetup();
       return;
@@ -1365,6 +1371,7 @@ ${readingSummaryCore}`;
 
 
     function resetCurrentReading() {
+          setActiveSetupPresetId("");
     resetQuestionRefinement();
     setCoinCastingHistory([]);
     setManualHexagramNumber("");
@@ -1967,7 +1974,10 @@ ${readingSummaryCore}`;
           />
         </label>
 
-        <SetupAutofillPanel onApplyPreset={applySetupAutofillPreset} />
+        <SetupAutofillPanel
+  activePresetId={activeSetupPresetId}
+  onApplyPreset={applySetupAutofillPreset}
+/>
 
         <QuickSetupButtons
           onQuickSelf={quickFillSelfBusiness}
