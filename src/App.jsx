@@ -1988,11 +1988,7 @@ ${readingSummaryCore}`;
           showTimeframeButton={showTimeframeQuickButton}
           inferredTimeframe={setupCompletion.inferredTimeframe}
         />
-                <div className="snapshot-actions" style={{ justifyContent: "flex-start" }}>
-          <button onClick={runOneClickAppMoneyReadySetup}>
-            One-click App Money Ready Setup
-          </button>
-        </div>
+       
         <div className="field-grid">
           <label>
             Intent category
@@ -2571,11 +2567,6 @@ ${readingSummaryCore}`;
           onUseCurrentTime={useCurrentCastingTime}
           onUseCurrentDateTime={useCurrentCastingDateTime}
         />
-                 <div className="snapshot-actions" style={{ justifyContent: "flex-start" }}>
-          <button onClick={runOneClickAppMoneyReadySetup}>
-            One-click App Money Ready Setup
-          </button>
-        </div>
 
        
       
