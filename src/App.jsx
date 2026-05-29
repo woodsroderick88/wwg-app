@@ -71,6 +71,12 @@ import {
   setupAutofillPresets,
 } from "./logic/setupAutofillLogic";
 import {
+  formatDateTimeAutofillStatus,
+  getLocalDateInputValue,
+  getLocalDateTimeInputValues,
+  getLocalTimeInputValue,
+} from "./logic/dateTimeAutofillLogic";
+import {
   buildSnapshotsExportJson,
   clearSavedSnapshots,
   createSnapshot,
@@ -542,6 +548,19 @@ function QuickSetupButtons({
           Use detected timeframe: {inferredTimeframe}
         </button>
       ) : null}
+    </div>
+  );
+}
+function DateTimeAutofillButtons({
+  onUseToday,
+  onUseCurrentTime,
+  onUseCurrentDateTime,
+}) {
+  return (
+    <div className="snapshot-actions" style={{ justifyContent: "flex-start" }}>
+      <button onClick={onUseToday}>Use today’s date</button>
+      <button onClick={onUseCurrentTime}>Use current time</button>
+      <button onClick={onUseCurrentDateTime}>Use current date + time</button>
     </div>
   );
 }
@@ -1249,6 +1268,43 @@ ${readingSummaryCore}`;
     setCopied(false);
     setDeleteConfirmArmed(false);
   }
+    function useTodayCastingDate() {
+    const nextCastingDate = getLocalDateInputValue();
+
+    setCastingDate(nextCastingDate);
+    setSnapshotStatus(
+      formatDateTimeAutofillStatus({
+        castingDate: nextCastingDate,
+        castingTime: "",
+      })
+    );
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+  function useCurrentCastingTime() {
+    const nextCastingTime = getLocalTimeInputValue();
+
+    setCastingTime(nextCastingTime);
+    setSnapshotStatus(
+      formatDateTimeAutofillStatus({
+        castingDate: "",
+        castingTime: nextCastingTime,
+      })
+    );
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+  function useCurrentCastingDateTime() {
+    const nextDateTime = getLocalDateTimeInputValues();
+
+    setCastingDate(nextDateTime.castingDate);
+    setCastingTime(nextDateTime.castingTime);
+    setSnapshotStatus(formatDateTimeAutofillStatus(nextDateTime));
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
     function resetCurrentReading() {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
@@ -1863,7 +1919,7 @@ ${readingSummaryCore}`;
           showTimeframeButton={showTimeframeQuickButton}
           inferredTimeframe={setupCompletion.inferredTimeframe}
         />
-
+        
         <div className="field-grid">
           <label>
             Intent category
@@ -2252,7 +2308,11 @@ ${readingSummaryCore}`;
           showTimeframeButton={showTimeframeQuickButton}
           inferredTimeframe={setupCompletion.inferredTimeframe}
         />
-
+ <DateTimeAutofillButtons
+          onUseToday={useTodayCastingDate}
+          onUseCurrentTime={useCurrentCastingTime}
+          onUseCurrentDateTime={useCurrentCastingDateTime}
+        />
         <label className="checkbox-row">
           <input
             type="checkbox"
@@ -2432,7 +2492,11 @@ ${readingSummaryCore}`;
           showTimeframeButton={showTimeframeQuickButton}
           inferredTimeframe={setupCompletion.inferredTimeframe}
         />
-
+        <DateTimeAutofillButtons
+          onUseToday={useTodayCastingDate}
+          onUseCurrentTime={useCurrentCastingTime}
+          onUseCurrentDateTime={useCurrentCastingDateTime}
+        />
         {setupCompletion.nextActions.length > 0 && (
           <div className="recommendation-box">
             <strong>Next setup actions:</strong>
