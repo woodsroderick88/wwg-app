@@ -1208,6 +1208,10 @@ ${readingSummaryCore}`;
   }
 
   function applySetupAutofillPreset(presetId) {
+        if (presetId === "app-money") {
+      runOneClickAppMoneyReadySetup();
+      return;
+    }
     const result = buildSetupAutofillPatch({
       presetId,
       currentState: {
@@ -1305,6 +1309,61 @@ ${readingSummaryCore}`;
     setCopied(false);
     setDeleteConfirmArmed(false);
   }
+
+  function runOneClickAppMoneyReadySetup() {
+    const defaultAppMoneyTimeframe = "within the next three months";
+
+    const nextDateTime = getLocalDateTimeInputValues();
+
+    const result = buildSetupAutofillPatch({
+      presetId: "app-money",
+      currentState: {
+        selfRole,
+        objectRole,
+        knownFacts,
+        assumptions,
+        location,
+        timeframe,
+      },
+      detectedTimeframe:
+        setupCompletion.inferredTimeframe || timeframe || defaultAppMoneyTimeframe,
+    });
+
+    if (!result.ok) {
+      setSnapshotStatus(result.message);
+      return;
+    }
+
+    const nextFinalQuestion =
+      cleanQuestionText(questionRefinement.suggestedFinalQuestion) ||
+      cleanQuestionText(rawQuestion) ||
+      "Will this app make money?";
+
+    setSelfRole(result.patch.selfRole);
+    setObjectRole(result.patch.objectRole);
+    setKnownFacts(result.patch.knownFacts);
+    setAssumptions(result.patch.assumptions);
+    setLocation(result.patch.location);
+    setTimeframe(result.patch.timeframe || defaultAppMoneyTimeframe);
+
+    setQuestion(nextFinalQuestion);
+
+    setCastingDate(nextDateTime.castingDate);
+    setCastingTime(nextDateTime.castingTime);
+
+    if (selectedMethod !== "GLDM") {
+      setSelectedMethod("GLDM");
+      setManualFocus("");
+    }
+
+    setSnapshotStatus(
+      `One-click App Money Ready Setup applied: ${nextDateTime.castingDate} ${nextDateTime.castingTime}.`
+    );
+    setCopied(false);
+    setDeleteConfirmArmed(false);
+  }
+
+
     function resetCurrentReading() {
     resetQuestionRefinement();
     setCoinCastingHistory([]);
@@ -1919,7 +1978,11 @@ ${readingSummaryCore}`;
           showTimeframeButton={showTimeframeQuickButton}
           inferredTimeframe={setupCompletion.inferredTimeframe}
         />
-        
+                <div className="snapshot-actions" style={{ justifyContent: "flex-start" }}>
+          <button onClick={runOneClickAppMoneyReadySetup}>
+            One-click App Money Ready Setup
+          </button>
+        </div>
         <div className="field-grid">
           <label>
             Intent category
@@ -2308,12 +2371,13 @@ ${readingSummaryCore}`;
           showTimeframeButton={showTimeframeQuickButton}
           inferredTimeframe={setupCompletion.inferredTimeframe}
         />
- <DateTimeAutofillButtons
+
+        <DateTimeAutofillButtons
           onUseToday={useTodayCastingDate}
           onUseCurrentTime={useCurrentCastingTime}
           onUseCurrentDateTime={useCurrentCastingDateTime}
         />
-        <label className="checkbox-row">
+   <label className="checkbox-row">
           <input
             type="checkbox"
             checked={manualCalendarMode}
@@ -2497,6 +2561,14 @@ ${readingSummaryCore}`;
           onUseCurrentTime={useCurrentCastingTime}
           onUseCurrentDateTime={useCurrentCastingDateTime}
         />
+                 <div className="snapshot-actions" style={{ justifyContent: "flex-start" }}>
+          <button onClick={runOneClickAppMoneyReadySetup}>
+            One-click App Money Ready Setup
+          </button>
+        </div>
+
+       
+      
         {setupCompletion.nextActions.length > 0 && (
           <div className="recommendation-box">
             <strong>Next setup actions:</strong>
@@ -3736,6 +3808,7 @@ ${readingSummaryCore}`;
       </section>
     </main>
   );
-}
+  }
+
 
 export default App;
