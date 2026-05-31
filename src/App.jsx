@@ -209,7 +209,22 @@ function cleanRawQuestionInput(value) {
     .replace(/^\s*raw\s+question\s*:\s*/i, "")
     .trimStart();
 }
+
+function cleanSavedReadingTitle(value) {
+  return String(value || "")
+    .replace(/^\s*raw\s+question\s*:\s*/i, "")
+    .replace(
+      /\s+in\s+three\s+months\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i,
+      "?"
+    )
+    .replace(/\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i, "?")
+    .replace(/\s+/g, " ")
+    .replace(/\?+$/g, "?")
+    .trim();
+}
+
 function buildManualHexagramExportSummary({
+
   manualHexagramNumber,
   manualHexagramMovingLines,
   lines,
@@ -1616,7 +1631,7 @@ ${readingSummaryCore}`;
     }
 
     const snapshot = createSnapshot({
-      question: effectiveQuestion,
+      question: cleanSavedReadingTitle(effectiveQuestion) || effectiveQuestion,
       selectedMethod: normalizeMethodForSave(effectiveMethodId),
       selfRole,
       objectRole,
@@ -2569,7 +2584,7 @@ ${readingSummaryCore}`;
         <div className="helper-subsection-label">
           Manual Fine-Tuning
         </div>
-        
+
         <QuickSetupButtons
           onQuickSelf={quickFillSelfBusiness}
           onQuickObject={quickFillAppMoneyObject}
@@ -3443,7 +3458,7 @@ ${readingSummaryCore}`;
                   .filter((snapshot) => snapshot.id !== compareSnapshotBId)
                   .map((snapshot) => (
                     <option key={snapshot.id} value={snapshot.id}>
-                      {getSnapshotTitle(snapshot)}
+                      {cleanSavedReadingTitle(getSnapshotTitle(snapshot))}
                     </option>
                   ))}
               </select>
@@ -3472,7 +3487,7 @@ ${readingSummaryCore}`;
                   .filter((snapshot) => snapshot.id !== compareSnapshotAId)
                   .map((snapshot) => (
                     <option key={snapshot.id} value={snapshot.id}>
-                      {getSnapshotTitle(snapshot)}
+                      {cleanSavedReadingTitle(getSnapshotTitle(snapshot))}
                     </option>
                   ))}
               </select>
@@ -3621,11 +3636,10 @@ ${readingSummaryCore}`;
                         placeholder="Saved reading title"
                       />
                     ) : (
-                      <strong>
-                        {snapshot.title ||
-                          snapshot.question ||
-                          "Untitled reading"}
-                      </strong>
+                     <strong>
+  {cleanSavedReadingTitle(snapshot.title || snapshot.question) ||
+    "Untitled reading"}
+</strong>
                     )}
 
                     <span>
