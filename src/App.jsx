@@ -203,6 +203,12 @@ function getMethodDisplayName(methodId) {
 function normalizeMethodForSave(methodId) {
   return SELECTABLE_METHOD_IDS.includes(methodId) ? methodId : METHOD_PENDING_ID;
 }
+
+function cleanRawQuestionInput(value) {
+  return String(value || "")
+    .replace(/^\s*raw\s+question\s*:\s*/i, "")
+    .trimStart();
+}
 function buildManualHexagramExportSummary({
   manualHexagramNumber,
   manualHexagramMovingLines,
@@ -1967,7 +1973,7 @@ ${readingSummaryCore}`;
           <textarea
             value={rawQuestion}
             onChange={(event) => {
-              setRawQuestion(event.target.value);
+              setRawQuestion(cleanRawQuestionInput(event.target.value));
               resetCopyAndStatus();
             }}
             placeholder="Example: Will this app make money?"
