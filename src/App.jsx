@@ -510,13 +510,12 @@ function SetupChecklist({ setupCompletion }) {
 
 function SetupAutofillPanel({ activePresetId, onApplyPreset }) {
   return (
-    <div className="focus-panel">
-      <h3>Setup Autofill Helpers</h3>
-      <p className="section-note">
-        Use these helpers to quickly fill Self, Object, known facts,
-        assumptions, location, and detected timeframe without overwriting your
-        current question.
-      </p>
+         <div className="focus-panel">
+        <h3>Ready Setup Helpers</h3>
+        <p className="section-note">
+          Choose one setup card first to prepare the question, roles, timeframe,
+          known facts, location, date, and time. Then fine-tune manually if needed.
+        </p>
 
       <div className="preset-grid">
         {setupAutofillPresets.map((preset) => (
@@ -1984,6 +1983,9 @@ ${readingSummaryCore}`;
   activePresetId={activeSetupPresetId}
   onApplyPreset={applySetupAutofillPreset}
 />
+        <div className="helper-subsection-label">
+          Manual Fine-Tuning
+        </div>
 
         <QuickSetupButtons
           onQuickSelf={quickFillSelfBusiness}
@@ -2302,6 +2304,9 @@ ${readingSummaryCore}`;
             onApplyTimeframe={applyDetectedTimeframe}
           />
         </div>
+        <div className="helper-subsection-label">
+          Manual Fine-Tuning
+        </div>
 
         <QuickSetupButtons
           onQuickSelf={quickFillSelfBusiness}
@@ -2372,6 +2377,9 @@ ${readingSummaryCore}`;
               <option value="00:00">00:00 civil calendar rule</option>
             </select>
           </label>
+        </div>
+        <div className="helper-subsection-label">
+          Manual Fine-Tuning
         </div>
 
         <QuickSetupButtons
@@ -2558,7 +2566,10 @@ ${readingSummaryCore}`;
           />
           <CalendarConfidenceCard calendarConfidence={calendarConfidence} />
         </div>
-
+        <div className="helper-subsection-label">
+          Manual Fine-Tuning
+        </div>
+        
         <QuickSetupButtons
           onQuickSelf={quickFillSelfBusiness}
           onQuickObject={quickFillAppMoneyObject}
