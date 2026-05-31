@@ -689,3 +689,11 @@ h1 {
     width: 100%;
   }
 }
+.helper-subsection-label {
+  margin: 18px 0 10px;
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 222, 184, 0.78);
+}
