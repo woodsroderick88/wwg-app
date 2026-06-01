@@ -204,24 +204,30 @@ function normalizeMethodForSave(methodId) {
   return SELECTABLE_METHOD_IDS.includes(methodId) ? methodId : METHOD_PENDING_ID;
 }
 
-function cleanRawQuestionInput(value) {
-  return String(value || "")
-    .replace(/^\s*raw\s+question\s*:\s*/i, "")
-    .trimStart();
-}
-
-function cleanSavedReadingTitle(value) {
+function cleanDuplicateTimeframeText(value) {
   return String(value || "")
     .replace(/^\s*raw\s+question\s*:\s*/i, "")
     .replace(
       /\s+in\s+three\s+months\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i,
       "?"
     )
-    .replace(/\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i, "?")
+    .replace(
+      /\s+within\s+(?:the\s+)?next\s+three\s+months\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i,
+      " within the next three months?"
+    )
     .replace(/\s+/g, " ")
     .replace(/\?+$/g, "?")
     .trim();
 }
+
+function cleanRawQuestionInput(value) {
+  return cleanDuplicateTimeframeText(value).trimStart();
+}
+
+function cleanSavedReadingTitle(value) {
+  return cleanDuplicateTimeframeText(value);
+}
+ 
 
 function buildManualHexagramExportSummary({
 
@@ -1360,10 +1366,12 @@ ${readingSummaryCore}`;
       return;
     }
 
-    const nextFinalQuestion =
-      cleanQuestionText(questionRefinement.suggestedFinalQuestion) ||
+  const nextFinalQuestion =
+  cleanDuplicateTimeframeText(
+    cleanQuestionText(questionRefinement.suggestedFinalQuestion) ||
       cleanQuestionText(rawQuestion) ||
-      "Will this app make money?";
+      "Will this app make money?"
+  );
 
     setSelfRole(result.patch.selfRole);
     setObjectRole(result.patch.objectRole);
@@ -1490,7 +1498,11 @@ ${readingSummaryCore}`;
       return;
     }
 
-    setQuestion(cleanQuestionText(questionRefinement.suggestedFinalQuestion));
+   setQuestion(
+  cleanDuplicateTimeframeText(
+    cleanQuestionText(questionRefinement.suggestedFinalQuestion)
+  )
+);
 
     const methodHint = questionRefinement.methodHints?.[0];
 
@@ -2136,7 +2148,7 @@ ${readingSummaryCore}`;
           <textarea
             value={question}
             onChange={(event) => {
-              setQuestion(event.target.value);
+            setQuestion(cleanDuplicateTimeframeText(event.target.value));
               resetCopyAndStatus();
             }}
             placeholder="Example: Will this WWG app generate profit within the next three months?"
