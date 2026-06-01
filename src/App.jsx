@@ -118,8 +118,8 @@ function renderOriginalLine(lineKey) {
 
 function buildSnapshotSearchText(snapshot) {
   return [
-    snapshot.title,
-    snapshot.question,
+   getSnapshotTitle(snapshot),
+cleanSavedReadingTitle(snapshot.question),
     snapshot.note,
     snapshot.selectedMethod,
     snapshot.selfRole,
@@ -137,7 +137,10 @@ function buildSnapshotSearchText(snapshot) {
 }
 
 function getSnapshotTitle(snapshot) {
-  return String(snapshot.title || snapshot.question || "Untitled reading");
+  return (
+    cleanSavedReadingTitle(snapshot.title || snapshot.question) ||
+    "Untitled reading"
+  );
 }
 
 function getSnapshotTime(snapshot) {
@@ -210,6 +213,10 @@ function cleanDuplicateTimeframeText(value) {
     .replace(
       /\s+in\s+three\s+months\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i,
       "?"
+    )
+    .replace(
+      /\s+within\s+three\s+months\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i,
+      " within three months?"
     )
     .replace(
       /\s+within\s+(?:the\s+)?next\s+three\s+months\s+within\s+(?:the\s+)?next\s+three\s+months\s*\??$/i,
@@ -296,8 +303,8 @@ function buildSnapshotDetailsText(snapshot) {
   return `SNAPSHOT DETAILS
 
 CORE QUESTION
-Saved title: ${snapshot.title || "Untitled reading"}
-Question: ${snapshot.question || "Not set"}
+Saved title: ${getSnapshotTitle(snapshot)}
+Question: ${cleanSavedReadingTitle(snapshot.question) || "Not set"}
 Method: ${getMethodDisplayName(snapshot.selectedMethod)}
 Self: ${snapshot.selfRole || "Not set"}
 Object: ${snapshot.objectRole || "Not set"}
@@ -1785,7 +1792,7 @@ ${readingSummaryCore}`;
 
   function startRenameSnapshot(snapshot) {
     setRenamingSnapshotId(snapshot.id);
-    setRenameTitleDraft(snapshot.title || snapshot.question || "");
+    setRenameTitleDraft(getSnapshotTitle(snapshot));
     setEditingNoteSnapshotId("");
     setNoteDraft("");
     setViewingSnapshotId("");
@@ -3723,13 +3730,14 @@ ${readingSummaryCore}`;
                       <h3>Snapshot Details</h3>
 
                       <DetailSection title="Core Question">
+                       <DetailRow
+  label="Saved title"
+  value={getSnapshotTitle(snapshot)}
+/>
+
                         <DetailRow
-                          label="Saved title"
-                          value={snapshot.title || "Untitled reading"}
-                        />
-                        <DetailRow
-                          label="Question"
-                          value={snapshot.question || "Not set"}
+                      label="Question"
+value={cleanSavedReadingTitle(snapshot.question) || "Not set"}
                         />
                         <DetailRow
                           label="Method"
