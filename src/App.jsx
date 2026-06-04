@@ -236,6 +236,33 @@ function cleanSavedReadingTitle(value) {
 }
 
 function simplifySuggestedFinalQuestion(value) {
+  function preserveQuestionTimeframe(questionText, timeframeText) {
+  const cleanedQuestion = cleanDuplicateTimeframeText(cleanQuestionText(questionText));
+  const cleanedTimeframe = cleanDuplicateTimeframeText(cleanQuestionText(timeframeText));
+
+  if (!cleanedQuestion) {
+    return "";
+  }
+
+  if (!cleanedTimeframe) {
+    return cleanedQuestion;
+  }
+
+  if (/within\s+(?:the\s+)?next\s+three\s+months/i.test(cleanedQuestion)) {
+    return cleanedQuestion;
+  }
+
+  if (/within\s+three\s+months/i.test(cleanedQuestion)) {
+    return cleanedQuestion;
+  }
+
+  const questionWithoutPunctuation = cleanedQuestion.replace(/[?.!]\s*$/g, "");
+
+  return `${questionWithoutPunctuation} ${cleanedTimeframe}?`
+    .replace(/\s+/g, " ")
+    .replace(/\?+$/g, "?")
+    .trim();
+}
   const cleanedQuestion = cleanDuplicateTimeframeText(cleanQuestionText(value));
 
   return cleanedQuestion
@@ -1390,10 +1417,12 @@ ${readingSummaryCore}`;
       return;
     }
 
-const nextFinalQuestion =
+const nextFinalQuestion = preserveQuestionTimeframe(
   simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
-  cleanDuplicateTimeframeText(cleanQuestionText(rawQuestion)) ||
-  "Will this app make money?";
+    cleanDuplicateTimeframeText(cleanQuestionText(rawQuestion)) ||
+    "Will this app make money?",
+  result.patch.timeframe || defaultAppMoneyTimeframe
+);
   
 
     setSelfRole(result.patch.selfRole);
@@ -1521,8 +1550,11 @@ const nextFinalQuestion =
       return;
     }
 
-  setQuestion(
-  simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion)
+ setQuestion(
+  preserveQuestionTimeframe(
+    simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion),
+    timeframe
+  )
 );
 
     const methodHint = questionRefinement.methodHints?.[0];
@@ -1891,7 +1923,7 @@ const nextFinalQuestion =
 
     const exportJson = buildSnapshotsExportJson(savedSnapshots);
     const exportBlob = new Blob([exportJson], {
-      type: "application/json;charset=utf-8",
+      type: "applicationjson;charset=utf-8",
     });
 
     const exportUrl = URL.createObjectURL(exportBlob);
