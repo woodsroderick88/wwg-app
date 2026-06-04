@@ -2052,7 +2052,7 @@ const nextFinalQuestion = preserveQuestionTimeframe(
           <textarea
             value={rawQuestion}
             onChange={(event) => {
-              setRawQuestion(cleanRawQuestionInput(event.target.value));
+              setRawQuestion(event.target.value);
               resetCopyAndStatus();
             }}
             placeholder="Example: Will this app make money?"
