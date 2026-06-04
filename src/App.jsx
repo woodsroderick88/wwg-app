@@ -234,6 +234,23 @@ function cleanRawQuestionInput(value) {
 function cleanSavedReadingTitle(value) {
   return cleanDuplicateTimeframeText(value);
 }
+
+function simplifySuggestedFinalQuestion(value) {
+  const cleanedQuestion = cleanDuplicateTimeframeText(cleanQuestionText(value));
+
+  return cleanedQuestion
+    .replace(
+      /^Will\s+App revenue,\s+paying users,\s+and monetization\s+generate profit/i,
+      "Will this app generate profit"
+    )
+    .replace(
+      /^Will\s+app revenue,\s+paying users,\s+and monetization\s+generate profit/i,
+      "Will this app generate profit"
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
  
 
 function buildManualHexagramExportSummary({
@@ -1373,12 +1390,11 @@ ${readingSummaryCore}`;
       return;
     }
 
-  const nextFinalQuestion =
-  cleanDuplicateTimeframeText(
-    cleanQuestionText(questionRefinement.suggestedFinalQuestion) ||
-      cleanQuestionText(rawQuestion) ||
-      "Will this app make money?"
-  );
+const nextFinalQuestion =
+  simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
+  cleanDuplicateTimeframeText(cleanQuestionText(rawQuestion)) ||
+  "Will this app make money?";
+  
 
     setSelfRole(result.patch.selfRole);
     setObjectRole(result.patch.objectRole);
@@ -1505,10 +1521,8 @@ ${readingSummaryCore}`;
       return;
     }
 
-   setQuestion(
-  cleanDuplicateTimeframeText(
-    cleanQuestionText(questionRefinement.suggestedFinalQuestion)
-  )
+  setQuestion(
+  simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion)
 );
 
     const methodHint = questionRefinement.methodHints?.[0];
@@ -2164,7 +2178,8 @@ ${readingSummaryCore}`;
 
         <div className="recommendation-box">
           <strong>Suggested final question:</strong>{" "}
-          {cleanQuestionText(questionRefinement.suggestedFinalQuestion) || "Add a raw question."}
+          {simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
+  "Add a raw question."}
         </div>
 
         <button className="export-button" onClick={useSuggestedFinalQuestion}>
