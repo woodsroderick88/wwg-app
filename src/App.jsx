@@ -1328,19 +1328,25 @@ ${readingSummaryCore}`;
     setDeleteConfirmArmed(false);
   }
 
-  function quickFillSelfBusiness() {
-    setSelfRole((currentValue) => buildQuickSelfBusiness(currentValue));
-    setSnapshotStatus("Quick Self applied.");
-    setCopied(false);
-    setDeleteConfirmArmed(false);
-  }
+ function quickFillSelfBusiness() {
+  setSelfRole((currentValue) =>
+    currentValue.trim() ? currentValue : "me / my WWG app business"
+  );
+  setSnapshotStatus("Quick Self applied.");
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
 
-  function quickFillAppMoneyObject() {
-    setObjectRole((currentValue) => buildQuickAppMoneyObject(currentValue));
-    setSnapshotStatus("Quick Object applied.");
-    setCopied(false);
-    setDeleteConfirmArmed(false);
-  }
+ function quickFillAppMoneyObject() {
+  setObjectRole((currentValue) =>
+    currentValue.trim()
+      ? currentValue
+      : "app profit / revenue / paying users"
+  );
+  setSnapshotStatus("Quick Object applied.");
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
 
   function quickFillKnownFact() {
     setKnownFacts((currentValue) => buildQuickKnownFact(currentValue));
