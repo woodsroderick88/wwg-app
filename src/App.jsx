@@ -1544,10 +1544,16 @@ const nextFinalQuestion = preserveQuestionTimeframe(
     scrollToQuestionSection();
   }
 
-  function useSuggestedFinalQuestion() {
+ function useSuggestedFinalQuestion() {
   const suggestedQuestion =
     simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
     cleanDuplicateTimeframeText(cleanQuestionText(rawQuestion));
+
+  const detectedTimeframe =
+    timeframe ||
+    setupCompletion.inferredTimeframe ||
+    questionRefinement.inferredTimeframe ||
+    "";
 
   if (!suggestedQuestion) {
     setSnapshotStatus(
@@ -1557,7 +1563,17 @@ const nextFinalQuestion = preserveQuestionTimeframe(
     return;
   }
 
-  setQuestion(cleanDuplicateTimeframeText(suggestedQuestion));
+  const hasTimeframe =
+    /within|next|months|weeks|days|years|year|by|before|after/i.test(
+      suggestedQuestion
+    );
+
+  const nextQuestion =
+    detectedTimeframe && !hasTimeframe
+      ? `${suggestedQuestion.replace(/[?.!]\s*$/g, "")} ${detectedTimeframe}?`
+      : suggestedQuestion;
+
+  setQuestion(cleanDuplicateTimeframeText(nextQuestion));
   setSnapshotStatus("Suggested final casting question applied.");
   setCopied(false);
   setDeleteConfirmArmed(false);
