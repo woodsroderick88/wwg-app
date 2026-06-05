@@ -2214,9 +2214,13 @@ const nextFinalQuestion = preserveQuestionTimeframe(
   "Add a raw question."}
         </div>
 
-        <button className="export-button" onClick={useSuggestedFinalQuestion}>
-          Use Suggested Final Question
-        </button>
+        <button
+  type="button"
+  className="export-button"
+  onClick={useSuggestedFinalQuestion}
+>
+  Use Suggested Final Question
+</button>
                 {draftQuestionState.isDraft && draftQuestionState.question && (
           <div className="recommendation-box">
             <strong>Draft final question in use:</strong>{" "}
