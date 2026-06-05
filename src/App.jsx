@@ -1545,32 +1545,23 @@ const nextFinalQuestion = preserveQuestionTimeframe(
   }
 
   function useSuggestedFinalQuestion() {
-    if (!questionRefinement.suggestedFinalQuestion) {
-      setSnapshotStatus("Add a raw question before generating a final question.");
-      return;
-    }
+  const suggestedQuestion =
+    simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
+    cleanDuplicateTimeframeText(cleanQuestionText(rawQuestion));
 
- setQuestion(
-  preserveQuestionTimeframe(
-    simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion),
-    timeframe
-  )
-);
-
-    const methodHint = questionRefinement.methodHints?.[0];
-
-    if (VALID_METHOD_IDS.includes(methodHint)) {
-      setSelectedMethod(methodHint);
-      setManualFocus("");
-      setSnapshotStatus(
-        `Suggested final casting question applied. Method synced to ${methodHint}.`
-      );
-    } else {
-      setSnapshotStatus("Suggested final casting question applied.");
-    }
-
+  if (!suggestedQuestion) {
+    setSnapshotStatus(
+      "Add a raw question before applying the suggested final question."
+    );
     setDeleteConfirmArmed(false);
+    return;
   }
+
+  setQuestion(cleanDuplicateTimeframeText(suggestedQuestion));
+  setSnapshotStatus("Suggested final casting question applied.");
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
 
   function castReadingWithCoins() {
     const methodHint = questionRefinement.methodHints?.[0];
