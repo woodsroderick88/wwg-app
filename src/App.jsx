@@ -1573,7 +1573,12 @@ const nextFinalQuestion = preserveQuestionTimeframe(
       ? `${suggestedQuestion.replace(/[?.!]\s*$/g, "")} ${detectedTimeframe}?`
       : suggestedQuestion;
 
-  setQuestion(cleanDuplicateTimeframeText(nextQuestion));
+   setQuestion(cleanDuplicateTimeframeText(nextQuestion));
+
+  if (detectedTimeframe && !timeframe) {
+    setTimeframe(detectedTimeframe);
+  }
+
   setSnapshotStatus("Suggested final casting question applied.");
   setCopied(false);
   setDeleteConfirmArmed(false);
