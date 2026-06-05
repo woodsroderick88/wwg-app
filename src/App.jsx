@@ -266,16 +266,20 @@ function simplifySuggestedFinalQuestion(value) {
   const cleanedQuestion = cleanDuplicateTimeframeText(cleanQuestionText(value));
 
   return cleanedQuestion
-    .replace(
-      /^Will\s+App revenue,\s+paying users,\s+and monetization\s+generate profit/i,
-      "Will this app generate profit"
-    )
-    .replace(
-      /^Will\s+app revenue,\s+paying users,\s+and monetization\s+generate profit/i,
-      "Will this app generate profit"
-    )
-    .replace(/\s+/g, " ")
-    .trim();
+  .replace(
+    /^Will\s+App revenue,\s+paying users,\s+and monetization\s+generate profit/i,
+    "Will this app generate profit"
+  )
+  .replace(
+    /^Will\s+app revenue,\s+paying users,\s+and monetization\s+generate profit/i,
+    "Will this app generate profit"
+  )
+  .replace(
+    /^Will\s+app profit\s*\/\s*revenue\s*\/\s*paying users\s+generate profit/i,
+    "Will this app generate profit"
+  )
+  .replace(/\s+/g, " ")
+  .trim();
 }
 
  
