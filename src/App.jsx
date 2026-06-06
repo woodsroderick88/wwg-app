@@ -1403,62 +1403,48 @@ ${readingSummaryCore}`;
     setDeleteConfirmArmed(false);
   }
 
-  function runOneClickAppMoneyReadySetup() {
-    const defaultAppMoneyTimeframe = "within the next three months";
+function runOneClickAppMoneyReadySetup() {
+  const defaultAppMoneyTimeframe = "in the next three months";
+  const nextDateTime = getLocalDateTimeInputValues();
 
-    const nextDateTime = getLocalDateTimeInputValues();
+  const nextRawQuestion =
+    rawQuestion.trim() || "Will this app generate profit in the next three months?";
 
-    const result = buildSetupAutofillPatch({
-      presetId: "app-money",
-      currentState: {
-        selfRole,
-        objectRole,
-        knownFacts,
-        assumptions,
-        location,
-        timeframe,
-      },
-      detectedTimeframe:
-        setupCompletion.inferredTimeframe || timeframe || defaultAppMoneyTimeframe,
-    });
+  const nextFinalQuestion = preserveQuestionTimeframe(
+    simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
+      cleanDuplicateTimeframeText(cleanQuestionText(nextRawQuestion)) ||
+      "Will this app generate profit?",
+    defaultAppMoneyTimeframe
+  );
 
-    if (!result.ok) {
-      setSnapshotStatus(result.message);
-      return;
-    }
+  setRawQuestion(nextRawQuestion);
+  setClarifiedIntent("profit from the WWG app");
+  setSelectedQuestionIntent("");
 
-const nextFinalQuestion = preserveQuestionTimeframe(
-  simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
-    cleanDuplicateTimeframeText(cleanQuestionText(rawQuestion)) ||
-    "Will this app make money?",
-  result.patch.timeframe || defaultAppMoneyTimeframe
+  setSelfRole("me / my WWG app business");
+  setObjectRole("app profit / revenue / paying users");
+ setKnownFacts(
+  "The WWG app is built and deployed. Current work is focused on improving the product, reducing friction, and testing monetization."
 );
-  
+  setAssumptions(
+    "I assume people may pay for it once the value, positioning, and user flow are clear."
+  );
+  setLocation("Chicago, Central Time");
+  setTimeframe(defaultAppMoneyTimeframe);
 
-    setSelfRole(result.patch.selfRole);
-    setObjectRole(result.patch.objectRole);
-    setKnownFacts(result.patch.knownFacts);
-    setAssumptions(result.patch.assumptions);
-    setLocation(result.patch.location);
-    setTimeframe(result.patch.timeframe || defaultAppMoneyTimeframe);
+  setQuestion(cleanDuplicateTimeframeText(nextFinalQuestion));
 
-    setQuestion(nextFinalQuestion);
+ setCastingDate(nextDateTime.castingDate || getLocalDateInputValue());
+setCastingTime(nextDateTime.castingTime || getLocalTimeInputValue());
+  setSelectedMethod("GLDM");
+  setManualFocus("");
 
-    setCastingDate(nextDateTime.castingDate);
-    setCastingTime(nextDateTime.castingTime);
-
-        if (selectedMethod !== "GLDM") {
-      setSelectedMethod("GLDM");
-      setManualFocus("");
-    }
-
-    setSnapshotStatus(
-      `App money setup applied. Ready to cast: ${nextDateTime.castingDate} ${nextDateTime.castingTime}.`
-    );
-    setCopied(false);
-    setDeleteConfirmArmed(false);
-  }
-
+  setSnapshotStatus(
+  `App money setup applied. Ready-to-cast fields filled.`
+  );
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
 
     function resetCurrentReading() {
           setActiveSetupPresetId("");
