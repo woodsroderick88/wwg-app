@@ -1421,8 +1421,13 @@ function runOneClickAppMoneyReadySetup() {
   setClarifiedIntent("profit from the WWG app");
   setSelectedQuestionIntent("");
 
-  setSelfRole("me / my WWG app business");
-  setObjectRole("app profit / revenue / paying users");
+ setSelfRole((currentValue) =>
+  currentValue.trim() ? currentValue : "me / my WWG app business"
+);
+
+setObjectRole((currentValue) =>
+  currentValue.trim() ? currentValue : "app profit / revenue / paying users"
+);
  setKnownFacts(
   "The WWG app is built and deployed. Current work is focused on improving the product, reducing friction, and testing monetization."
 );
@@ -1432,7 +1437,7 @@ function runOneClickAppMoneyReadySetup() {
   setLocation("Chicago, Central Time");
   setTimeframe(defaultAppMoneyTimeframe);
 
-  setQuestion(cleanDuplicateTimeframeText(nextFinalQuestion));
+  setQuestion("Will this app generate profit in the next three months?");
 
  setCastingDate(nextDateTime.castingDate || getLocalDateInputValue());
 setCastingTime(nextDateTime.castingTime || getLocalTimeInputValue());
