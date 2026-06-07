@@ -1294,13 +1294,14 @@ ${readingSummaryCore}`;
   }
 
   function applySetupAutofillPreset(presetId) {
-        setActiveSetupPresetId(presetId);
-        if (presetId === "app-money") {
+    setActiveSetupPresetId(presetId);
+
+    if (presetId === "app-money") {
       runOneClickAppMoneyReadySetup();
       return;
     }
-    const result = buildSetupAutofillPatch({
-      presetId,
+      const result = buildSetupAutofillPatch({
+  presetId,
       currentState: {
         selfRole,
         objectRole,
@@ -1402,51 +1403,35 @@ ${readingSummaryCore}`;
     setCopied(false);
     setDeleteConfirmArmed(false);
   }
-
 function runOneClickAppMoneyReadySetup() {
-  const defaultAppMoneyTimeframe = "in the next three months";
   const nextDateTime = getLocalDateTimeInputValues();
 
-  const nextRawQuestion =
-    rawQuestion.trim() || "Will this app generate profit in the next three months?";
-
-  const nextFinalQuestion = preserveQuestionTimeframe(
-    simplifySuggestedFinalQuestion(questionRefinement.suggestedFinalQuestion) ||
-      cleanDuplicateTimeframeText(cleanQuestionText(nextRawQuestion)) ||
-      "Will this app generate profit?",
-    defaultAppMoneyTimeframe
-  );
-
-  setRawQuestion(nextRawQuestion);
+  setRawQuestion("Will this app generate profit in the next three months?");
+  setQuestion("Will this app generate profit in the next three months?");
   setClarifiedIntent("profit from the WWG app");
   setSelectedQuestionIntent("");
 
- setSelfRole((currentValue) =>
-  currentValue.trim() ? currentValue : "me / my WWG app business"
-);
+  setSelfRole("me / my WWG app business");
+  setObjectRole("app profit / revenue / paying users");
+  setTimeframe("in the next three months");
 
-setObjectRole((currentValue) =>
-  currentValue.trim() ? currentValue : "app profit / revenue / paying users"
-);
- setKnownFacts(
-  "The WWG app is built and deployed. Current work is focused on improving the product, reducing friction, and testing monetization."
-);
+  setKnownFacts(
+    "The app is built and deployed. Current work is focused on improving the product, reducing friction, and testing monetization."
+  );
   setAssumptions(
     "I assume people may pay for it once the value, positioning, and user flow are clear."
   );
+
   setLocation("Chicago, Central Time");
-  setTimeframe(defaultAppMoneyTimeframe);
+  setCastingDate(nextDateTime.castingDate || getLocalDateInputValue());
+  setCastingTime(nextDateTime.castingTime || getLocalTimeInputValue());
 
-  setQuestion("Will this app generate profit in the next three months?");
-
- setCastingDate(nextDateTime.castingDate || getLocalDateInputValue());
-setCastingTime(nextDateTime.castingTime || getLocalTimeInputValue());
   setSelectedMethod("GLDM");
   setManualFocus("");
 
-  setSnapshotStatus(
-  `App money setup applied. Ready-to-cast fields filled.`
-  );
+setSnapshotStatus(
+  "App money setup applied. Ready-to-cast fields filled."
+);
   setCopied(false);
   setDeleteConfirmArmed(false);
 }
