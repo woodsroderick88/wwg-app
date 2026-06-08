@@ -1293,46 +1293,82 @@ ${readingSummaryCore}`;
     setDeleteConfirmArmed(false);
   }
 
-  function applySetupAutofillPreset(presetId) {
-    setActiveSetupPresetId(presetId);
+ function applySetupAutofillPreset(presetId) {
+  setActiveSetupPresetId(presetId);
 
-    if (presetId === "app-money") {
-      runOneClickAppMoneyReadySetup();
-      return;
-    }
-      const result = buildSetupAutofillPatch({
-  presetId,
-      currentState: {
-        selfRole,
-        objectRole,
-        knownFacts,
-        assumptions,
-        location,
-        timeframe,
-      },
-      detectedTimeframe: setupCompletion.inferredTimeframe,
-    });
-
-    if (!result.ok) {
-      setSnapshotStatus(result.message);
-      return;
-    }
-
-    setSelfRole(result.patch.selfRole);
-    setObjectRole(result.patch.objectRole);
-    setKnownFacts(result.patch.knownFacts);
-    setAssumptions(result.patch.assumptions);
-    setLocation(result.patch.location);
-
-    if (result.patch.timeframe) {
-      setTimeframe(result.patch.timeframe);
-    }
-
-    setSnapshotStatus(result.message);
-    setCopied(false);
-    setDeleteConfirmArmed(false);
+  if (presetId === "app-money") {
+    runOneClickAppMoneyReadySetup();
+    return;
   }
 
+  if (presetId === "career-income") {
+    runOneClickReadySetup({
+      rawQuestionText:
+        "Will this career or income opportunity improve within the next three months?",
+      finalQuestionText:
+        "Will this career or income opportunity improve within the next three months?",
+      clarifiedIntentText: "career or income improvement",
+      selfText: "me / my career path",
+      objectText: "job, client, income opportunity, or professional outcome",
+      timeframeText: "within the next three months",
+      knownFactsText:
+        "The question concerns work, income, opportunity, or career direction. The final result depends on timing, effort, and outside response.",
+      assumptionsText:
+        "I assume the opportunity may improve if follow-up, positioning, and practical action are strong.",
+      methodId: "GLDM",
+      statusText:
+        "Career / income setup applied. Ready-to-cast fields filled.",
+    });
+    return;
+  }
+
+  if (presetId === "relationship") {
+    runOneClickReadySetup({
+      rawQuestionText:
+        "Will this relationship develop positively within the next three months?",
+      finalQuestionText:
+        "Will this relationship develop positively within the next three months?",
+      clarifiedIntentText: "relationship development",
+      selfText: "me / my side of the relationship",
+      objectText: "the other person and the relationship dynamic",
+      timeframeText: "within the next three months",
+      knownFactsText:
+        "The question concerns the relationship pattern, communication, and current interaction.",
+      assumptionsText:
+        "I assume the situation may change depending on communication, timing, and each person’s willingness.",
+      methodId: "RIDM",
+      statusText:
+        "Relationship setup applied. Ready-to-cast fields filled.",
+    });
+    return;
+  }
+
+  if (presetId === "timing") {
+    runOneClickReadySetup({
+      rawQuestionText:
+        "When is this event likely to happen within the next three months?",
+      finalQuestionText:
+        "When is this event likely to happen within the next three months?",
+      clarifiedIntentText: "timing of an event or outcome",
+      selfText: "me / my position in the timing question",
+      objectText:
+        "the event, outcome, message, approval, or trigger being timed",
+      timeframeText: "within the next three months",
+      knownFactsText:
+        "The question concerns timing. Real-world triggers, deadlines, messages, approvals, or movement should be tracked.",
+      assumptionsText:
+        "I assume the event may depend on an external trigger, moving condition, or calendar activation.",
+      methodId: "TDM",
+      statusText:
+        "Timing setup applied. Ready-to-cast fields filled.",
+    });
+    return;
+  }
+
+  setSnapshotStatus("Unknown setup preset.");
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
  function quickFillSelfBusiness() {
   setSelfRole((currentValue) =>
     currentValue.trim() ? currentValue : "me / my WWG app business"
@@ -1380,29 +1416,68 @@ ${readingSummaryCore}`;
     setDeleteConfirmArmed(false);
   }
 
-  function useCurrentCastingTime() {
-    const nextCastingTime = getLocalTimeInputValue();
+function useCurrentCastingTime() {
+  const nextCastingTime = getLocalTimeInputValue();
 
-    setCastingTime(nextCastingTime);
-    setSnapshotStatus(
-      formatDateTimeAutofillStatus({
-        castingDate: "",
-        castingTime: nextCastingTime,
-      })
-    );
-    setCopied(false);
-    setDeleteConfirmArmed(false);
-  }
+  setCastingTime(nextCastingTime);
+  setSnapshotStatus(
+    formatDateTimeAutofillStatus({
+      castingDate: "",
+      castingTime: nextCastingTime,
+    })
+  );
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
 
-  function useCurrentCastingDateTime() {
-    const nextDateTime = getLocalDateTimeInputValues();
+ function useCurrentCastingDateTime() {
+  const nextDateTime = getLocalDateTimeInputValues();
 
-    setCastingDate(nextDateTime.castingDate);
-    setCastingTime(nextDateTime.castingTime);
-    setSnapshotStatus(formatDateTimeAutofillStatus(nextDateTime));
-    setCopied(false);
-    setDeleteConfirmArmed(false);
-  }
+  setCastingDate(nextDateTime.castingDate);
+  setCastingTime(nextDateTime.castingTime);
+  setSnapshotStatus(formatDateTimeAutofillStatus(nextDateTime));
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
+
+ function runOneClickReadySetup({
+  rawQuestionText,
+  finalQuestionText,
+  clarifiedIntentText,
+  selfText,
+  objectText,
+  timeframeText,
+  knownFactsText,
+  assumptionsText,
+  methodId,
+  statusText,
+}) {
+  const nextDateTime = getLocalDateTimeInputValues();
+
+  setRawQuestion(rawQuestionText);
+  setQuestion(finalQuestionText);
+  setClarifiedIntent(clarifiedIntentText);
+  setSelectedQuestionIntent("");
+
+  setSelfRole(selfText);
+  setObjectRole(objectText);
+  setTimeframe(timeframeText);
+
+  setKnownFacts(knownFactsText);
+  setAssumptions(assumptionsText);
+
+  setLocation("Chicago, Central Time");
+  setCastingDate(nextDateTime.castingDate || getLocalDateInputValue());
+  setCastingTime(nextDateTime.castingTime || getLocalTimeInputValue());
+
+  setSelectedMethod(methodId);
+  setManualFocus("");
+
+  setSnapshotStatus(statusText);
+  setCopied(false);
+  setDeleteConfirmArmed(false);
+}
+
 function runOneClickAppMoneyReadySetup() {
   const nextDateTime = getLocalDateTimeInputValues();
 
@@ -1429,9 +1504,9 @@ function runOneClickAppMoneyReadySetup() {
   setSelectedMethod("GLDM");
   setManualFocus("");
 
-setSnapshotStatus(
-  "App money setup applied. Ready-to-cast fields filled."
-);
+  setSnapshotStatus(
+    "App money setup applied. Ready-to-cast fields filled."
+  );
   setCopied(false);
   setDeleteConfirmArmed(false);
 }
